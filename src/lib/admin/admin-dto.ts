@@ -14,6 +14,14 @@ export type AdminPlatformStatsClient = {
   totalRevenueMinor: number;
   mostPopularPlanSlug: string | null;
   mostPopularPlanCount: number;
+  /** `User.authSource` — faqat Telegram jadvalidagi qatorlar. */
+  userAuthTelegram: number;
+  userAuthBoth: number;
+  /** Faol boshqariladigan obunalar `acquisitionChannel` bo‘yicha (null = belgilanmagan). */
+  managedAcqTelegramMiniApp: number;
+  managedAcqWebsite: number;
+  managedAcqAdmin: number;
+  managedAcqUnset: number;
 };
 
 export type UnifiedUserAdminRow = {

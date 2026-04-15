@@ -4,10 +4,18 @@ import Script from "next/script";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
+type PreviewPageMeta = { slug: string; title: string };
+
 type PreviewState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; siteName: string; previewSrcDoc: string };
+  | {
+      status: "ready";
+      siteName: string;
+      previewSrcDoc: string;
+      pages: PreviewPageMeta[];
+      activePageSlug: string | null;
+    };
 
 function MiniAppPreviewInner() {
   const searchParams = useSearchParams();
@@ -15,49 +23,68 @@ function MiniAppPreviewInner() {
   const [state, setState] = useState<PreviewState>({ status: "loading" });
   const [scriptReady, setScriptReady] = useState(false);
 
-  const loadPreview = useCallback(async () => {
-    if (!siteId) {
-      setState({ status: "error", message: "Sayt identifikatori (site) URLda yo‘q." });
-      return;
-    }
+  const loadPreview = useCallback(
+    async (pageSlug: string | null) => {
+      if (!siteId) {
+        setState({ status: "error", message: "Sayt identifikatori (site) URLda yo‘q." });
+        return;
+      }
 
-    const initData = window.Telegram?.WebApp?.initData ?? "";
-    if (!initData) {
-      setState({
-        status: "error",
-        message: "Telegram initData topilmadi. Iltimos, bot orqali Mini Appni oching.",
-      });
-      return;
-    }
+      const initData = window.Telegram?.WebApp?.initData ?? "";
+      if (!initData) {
+        setState({
+          status: "error",
+          message: "Telegram initData topilmadi. Iltimos, bot orqali Mini Appni oching.",
+        });
+        return;
+      }
 
-    try {
-      const response = await fetch(`/api/miniapp/preview?site=${encodeURIComponent(siteId)}`, {
-        headers: { Authorization: `tma ${initData}` },
-      });
-      let payload: { previewSrcDoc?: string; siteName?: string; error?: string };
+      setState((prev) => (prev.status === "ready" ? prev : { status: "loading" }));
+
+      const qs = new URLSearchParams({ site: siteId });
+      if (pageSlug) {
+        qs.set("page", pageSlug);
+      }
+
       try {
-        payload = (await response.json()) as { previewSrcDoc?: string; siteName?: string; error?: string };
+        const response = await fetch(`/api/miniapp/preview?${qs.toString()}`, {
+          headers: { Authorization: `tma ${initData}` },
+        });
+        let payload: {
+          previewSrcDoc?: string;
+          siteName?: string;
+          pages?: PreviewPageMeta[];
+          activePage?: string | null;
+          error?: string;
+        };
+        try {
+          payload = (await response.json()) as typeof payload;
+        } catch {
+          setState({ status: "error", message: "Server javobi noto‘g‘ri formatda." });
+          return;
+        }
+        if (!response.ok) {
+          setState({ status: "error", message: payload.error ?? `HTTP ${response.status}` });
+          return;
+        }
+        if (!payload.previewSrcDoc || !payload.siteName) {
+          setState({ status: "error", message: "Server javobi to‘liq emas." });
+          return;
+        }
+        const pages = Array.isArray(payload.pages) ? payload.pages : [];
+        setState({
+          status: "ready",
+          siteName: payload.siteName,
+          previewSrcDoc: payload.previewSrcDoc,
+          pages,
+          activePageSlug: payload.activePage ?? pages[0]?.slug ?? null,
+        });
       } catch {
-        setState({ status: "error", message: "Server javobi noto‘g‘ri formatda." });
-        return;
+        setState({ status: "error", message: "Tarmoq xatosi." });
       }
-      if (!response.ok) {
-        setState({ status: "error", message: payload.error ?? `HTTP ${response.status}` });
-        return;
-      }
-      if (!payload.previewSrcDoc || !payload.siteName) {
-        setState({ status: "error", message: "Server javobi to‘liq emas." });
-        return;
-      }
-      setState({
-        status: "ready",
-        siteName: payload.siteName,
-        previewSrcDoc: payload.previewSrcDoc,
-      });
-    } catch {
-      setState({ status: "error", message: "Tarmoq xatosi." });
-    }
-  }, [siteId]);
+    },
+    [siteId],
+  );
 
   useEffect(() => {
     if (!scriptReady || !siteId) {
@@ -65,8 +92,19 @@ function MiniAppPreviewInner() {
     }
     window.Telegram?.WebApp?.ready();
     window.Telegram?.WebApp?.expand();
-    void loadPreview();
-  }, [scriptReady, siteId, loadPreview]);
+    const initial = searchParams.get("page")?.trim() || null;
+    void loadPreview(initial);
+  }, [scriptReady, siteId, loadPreview, searchParams]);
+
+  const onSelectPage = (slug: string) => {
+    if (state.status !== "ready") {
+      return;
+    }
+    if (slug === state.activePageSlug) {
+      return;
+    }
+    void loadPreview(slug);
+  };
 
   return (
     <>
@@ -76,25 +114,46 @@ function MiniAppPreviewInner() {
         onLoad={() => setScriptReady(true)}
       />
       <main className="flex min-h-dvh flex-col">
-        <header className="border-b border-slate-200 px-4 py-3">
-          <h1 className="text-sm font-semibold text-slate-900">
+        <header className="border-b border-border bg-card px-4 py-3">
+          <h1 className="text-sm font-semibold text-foreground">
             {state.status === "ready" ? state.siteName : "Preview"}
           </h1>
-          <p className="text-xs text-slate-500">Telegram Mini App</p>
+          <p className="text-xs text-muted-foreground">Telegram Mini App</p>
         </header>
 
+        {state.status === "ready" && state.pages.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto border-b border-border bg-muted/20 px-3 py-2">
+            {state.pages.map((p) => {
+              const active = p.slug === state.activePageSlug;
+              return (
+                <button
+                  key={p.slug}
+                  type="button"
+                  onClick={() => onSelectPage(p.slug)}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    active ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground ring-1 ring-border"
+                  }`}
+                >
+                  {p.title || p.slug}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {state.status === "loading" ? (
-          <p className="p-4 text-sm text-slate-600">Yuklanmoqda…</p>
+          <p className="p-4 text-sm text-muted-foreground">Yuklanmoqda…</p>
         ) : null}
 
         {state.status === "error" ? (
-          <p className="p-4 text-sm text-red-700" role="alert">
+          <p className="p-4 text-sm text-destructive" role="alert">
             {state.message}
           </p>
         ) : null}
 
         {state.status === "ready" ? (
           <iframe
+            key={state.activePageSlug ?? "default"}
             title="Preview"
             className="min-h-[70vh] w-full flex-1 border-0"
             srcDoc={state.previewSrcDoc}
@@ -108,7 +167,7 @@ function MiniAppPreviewInner() {
 
 export default function MiniAppPreviewPage() {
   return (
-    <Suspense fallback={<p className="p-4 text-sm text-slate-600">Yuklanmoqda…</p>}>
+    <Suspense fallback={<p className="p-4 text-sm text-muted-foreground">Yuklanmoqda…</p>}>
       <MiniAppPreviewInner />
     </Suspense>
   );

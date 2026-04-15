@@ -4,6 +4,7 @@ import { getBotTokenForMiniApp, validateTelegramWebAppInitData } from "@/feature
 import { getSiteOwnedByTelegramUser } from "@/features/telegram-bot/services/site.service";
 import { websiteSchema } from "@/lib/ai/website-schema.zod";
 import { miniappSiteIdSchema } from "@/lib/miniapp-preview-params.zod";
+import { getResolvedPages } from "@/lib/ai/website-schema-pages";
 import { buildPreviewSrcDoc } from "@/shared/lib/build-preview-srcdoc";
 
 export const runtime = "nodejs";
@@ -69,9 +70,17 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: "Sxema buzilgan." }, { status: 500 });
     }
 
+    const schema = parsed.data;
+    const resolvedPages = getResolvedPages(schema);
+    const pageParam = url.searchParams.get("page")?.trim();
+    const initialPageSlug =
+      pageParam && resolvedPages.some((p) => p.slug === pageParam) ? pageParam : undefined;
+
     return NextResponse.json({
       siteName: site.title,
-      previewSrcDoc: buildPreviewSrcDoc(parsed.data),
+      previewSrcDoc: buildPreviewSrcDoc(schema, { initialPageSlug: initialPageSlug }),
+      pages: resolvedPages.map((p) => ({ slug: p.slug, title: p.title })),
+      activePage: initialPageSlug ?? resolvedPages[0]?.slug ?? null,
     });
   } catch (error) {
     console.error("[miniapp/preview]", error);

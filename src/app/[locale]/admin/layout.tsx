@@ -11,7 +11,7 @@ export default async function AdminSectionLayout({
 }: Readonly<{ children: ReactNode; params: P }>) {
   const { locale } = await Promise.resolve(params);
   if (!isAdminSession()) {
-    redirect(`/${locale}/login?next=admin`);
+    redirect(`/${locale}/login?mode=admin&next=admin`);
   }
   return <>{children}</>;
 }

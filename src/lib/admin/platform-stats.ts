@@ -16,6 +16,12 @@ export type AdminPlatformStats = {
   totalRevenueMinor: number;
   mostPopularPlanSlug: string | null;
   mostPopularPlanCount: number;
+  userAuthTelegram: number;
+  userAuthBoth: number;
+  managedAcqTelegramMiniApp: number;
+  managedAcqWebsite: number;
+  managedAcqAdmin: number;
+  managedAcqUnset: number;
 };
 
 function isLegacySubActive(expiresAt: Date | null): boolean {
@@ -42,6 +48,8 @@ export async function getAdminPlatformStats(): Promise<AdminPlatformStats> {
     legacyByPlan,
     allManagedSubs,
     tgUsers,
+    userAuthGroups,
+    managedAcqGroups,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.webUser.count(),
@@ -82,6 +90,15 @@ export async function getAdminPlatformStats(): Promise<AdminPlatformStats> {
           },
         },
       },
+    }),
+    prisma.user.groupBy({
+      by: ["authSource"],
+      _count: { authSource: true },
+    }),
+    prisma.managedSubscription.groupBy({
+      by: ["acquisitionChannel"],
+      where: { status: "ACTIVE" },
+      _count: { acquisitionChannel: true },
     }),
   ]);
 
@@ -140,6 +157,33 @@ export async function getAdminPlatformStats(): Promise<AdminPlatformStats> {
     }
   }
 
+  let userAuthTelegram = 0;
+  let userAuthBoth = 0;
+  for (const row of userAuthGroups) {
+    if (row.authSource === "TELEGRAM") {
+      userAuthTelegram = row._count.authSource;
+    } else if (row.authSource === "BOTH") {
+      userAuthBoth = row._count.authSource;
+    }
+  }
+
+  let managedAcqTelegramMiniApp = 0;
+  let managedAcqWebsite = 0;
+  let managedAcqAdmin = 0;
+  let managedAcqUnset = 0;
+  for (const row of managedAcqGroups) {
+    const c = row._count.acquisitionChannel;
+    if (row.acquisitionChannel === "TELEGRAM_MINI_APP") {
+      managedAcqTelegramMiniApp = c;
+    } else if (row.acquisitionChannel === "WEBSITE") {
+      managedAcqWebsite = c;
+    } else if (row.acquisitionChannel === "ADMIN") {
+      managedAcqAdmin = c;
+    } else {
+      managedAcqUnset += c;
+    }
+  }
+
   return {
     totalUsers: totalIdentities,
     usersWebsiteOnly: webCount - linkedBothCount,
@@ -154,5 +198,11 @@ export async function getAdminPlatformStats(): Promise<AdminPlatformStats> {
     totalRevenueMinor,
     mostPopularPlanSlug: topSlug,
     mostPopularPlanCount: topCount,
+    userAuthTelegram,
+    userAuthBoth,
+    managedAcqTelegramMiniApp,
+    managedAcqWebsite,
+    managedAcqAdmin,
+    managedAcqUnset,
   };
 }

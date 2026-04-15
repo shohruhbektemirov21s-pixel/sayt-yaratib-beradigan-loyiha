@@ -44,6 +44,12 @@ export function MiniProjectDetailClient() {
         <p className="mt-1 text-xs text-muted-foreground">Yangilangan: {row.updatedAt.slice(0, 19)}</p>
       </div>
       <Link
+        href={`/miniapp/builder?site=${encodeURIComponent(row.id)}`}
+        className="block rounded-2xl border border-border bg-card py-4 text-center text-sm font-semibold shadow-sm"
+      >
+        Tahrirlash (builder)
+      </Link>
+      <Link
         href={`/miniapp/preview?site=${encodeURIComponent(row.id)}`}
         className="block rounded-2xl bg-primary py-4 text-center text-sm font-semibold text-primary-foreground shadow-md"
       >

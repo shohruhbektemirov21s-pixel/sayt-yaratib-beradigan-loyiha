@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { saasElevatedPanel } from "@/components/ui/saas-surface";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { builderRegisterBodySchema } from "@/lib/auth/builder-register.validation";
 import { clientApiUrl } from "@/lib/client-api-url";
@@ -28,6 +28,7 @@ function firstIssue(issues: string[] | undefined, fallback: string): string {
 
 export function BuilderRegisterForm() {
   const t = useTranslations("BuilderSignup");
+  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [contact, setContact] = useState("");
@@ -35,7 +36,6 @@ export function BuilderRegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
 
   const clearField = useCallback((key: FieldKey) => {
@@ -130,8 +130,14 @@ export function BuilderRegisterForm() {
       }
 
       if (res.ok && data.ok) {
-        setDone(true);
         toast.success(t("toastOk"));
+        router.push("/");
+        router.refresh();
+        return;
+      }
+
+      if (res.status === 409 && data.error === "contact_taken") {
+        toast.error(t("toastTaken"));
         return;
       }
 
@@ -149,37 +155,10 @@ export function BuilderRegisterForm() {
     } finally {
       setBusy(false);
     }
-  }, [confirmPassword, contact, firstName, lastName, password, runClientValidation, t, translateIssue]);
+  }, [confirmPassword, contact, firstName, lastName, password, router, runClientValidation, t, translateIssue]);
 
   const inputClass =
     "mt-1.5 w-full rounded-2xl border border-border/80 bg-background px-4 py-3.5 text-sm shadow-inner outline-none ring-offset-background placeholder:text-muted-foreground transition focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
-
-  if (done) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50 to-white p-6 text-emerald-950 shadow-xl backdrop-blur-md dark:border-emerald-800/50 dark:from-emerald-950/50 dark:to-slate-900 dark:text-emerald-50"
-      >
-        <h2 className="text-lg font-bold tracking-tight">{t("successTitle")}</h2>
-        <p className="mt-2 text-sm leading-relaxed opacity-90">{t("successBody")}</p>
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Link
-            href="/builder-login"
-            className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-md"
-          >
-            {t("goLogin")}
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-xl border border-border/80 bg-background px-4 py-2.5 text-sm font-semibold text-foreground"
-          >
-            {t("goHome")}
-          </Link>
-        </div>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.form

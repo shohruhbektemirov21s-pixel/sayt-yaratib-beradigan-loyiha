@@ -7,9 +7,449 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Enums — yangi SaaS jadvallari
-// ---------------------------------------------------------------------------
+model User {
+  id                    String                 @id @default(cuid())
+  telegramId            String                 @unique
+  username              String?
+  firstName             String?
+  lastName              String?
+  languageCode          String?
+  /// Telegram profil rasmi URL (Mini App `user.photo_url`).
+  telegramPhotoUrl      String?                @map("telegram_photo_url") @db.VarChar(1024)
+  authSource            UserAuthSource         @default(TELEGRAM) @map("auth_source")
+  miniAppLastOpenedAt   DateTime?              @map("mini_app_last_opened_at")
+  /// Veb akkaunt bilan bog‘langan vaqt (xavfsiz linking flow).
+  telegramLinkedAt      DateTime?              @map("telegram_linked_at")
+  /// Mini App sessiyasini majburiy bekor qilish (force logout).
+  miniappSessionVersion Int                    @default(0) @map("miniapp_session_version")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  sites                 Site[]
+  subscriptions         Subscription[]
+  adminAuditLogsTarget  AdminAuditLog[]        @relation("AuditTelegramTarget")
+  analyticsEvents       AnalyticsEvent[]       @relation("AnalyticsEventUser")
+  managedSubscriptions  ManagedSubscription[]  @relation("ManagedSubTelegram")
+  linkedWebAccount      WebUser?               @relation("TelegramWebLink")
+  websiteProjectMembers WebsiteProjectMember[]
+  ownedWebsiteProjects  WebsiteProject[]       @relation("WebsiteProjectOwner")
+}
+
+model Subscription {
+  id             String    @id @default(cuid())
+  userId         String
+  plan           String
+  billingMonths  Int       @default(1)
+  siteTokenLimit Int       @default(5)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Site {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  slug       String
+  schemaJson Json
+  summary    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model TelegramSession {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// Web-builder uchun Payme hisobi; Payme `account.user_id` shu id bilan yuboriladi.
+model BillingAccount {
+  id                   String                @id @default(cuid())
+  tokenBalance         Int                   @default(0) @map("token_balance")
+  planTier             String                @default("basic")
+  subscriptionUntil    DateTime?
+  notifyTelegramId     String?               @map("notify_telegram_id")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  analyticsEvents      AnalyticsEvent[]      @relation("AnalyticsEventBilling")
+  billingProfile       BillingProfile?
+  managedSubscriptions ManagedSubscription[] @relation("ManagedSubBilling")
+  receiptPaymentCodes  ReceiptPaymentCode[]
+  receiptVerifications ReceiptVerification[]
+  transactions         PaymentTransaction[]
+  websiteProjects      WebsiteProject[]
+  webUser              WebUser?
+
+  @@map("billing_accounts")
+}
+
+/// Qo‘lda to‘lov: Payme «Izoh»da ko‘rsatiladigan yagona kod (masalan Usta-7782).
+model ReceiptPaymentCode {
+  id                String         @id @default(cuid())
+  code              String         @unique
+  billingAccountId  String         @map("billing_account_id")
+  planTier          String         @map("plan_tier")
+  billingMonths     Int            @map("billing_months")
+  expectedAmountUzs Int            @map("expected_amount_uzs")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  expiresAt         DateTime       @map("expires_at")
+  usedAt            DateTime?      @map("used_at")
+  billingAccount    BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@index([billingAccountId, expiresAt])
+  @@map("receipt_payment_codes")
+}
+
+/// Yuklangan chek: EXIF + OCR tekshiruvi natijalari (admin ko‘radi).
+model ReceiptVerification {
+  id                   String          @id @default(cuid())
+  createdAt            DateTime        @default(now()) @map("created_at")
+  billingAccountId     String?         @map("billing_account_id")
+  originalFileName     String          @map("original_file_name")
+  mimeType             String          @map("mime_type")
+  storagePath          String          @map("storage_path")
+  exifSoftware         String?         @map("exif_software")
+  suspiciousEdit       Boolean         @default(false) @map("suspicious_edit")
+  ocrRaw               String?         @map("ocr_raw")
+  hasExpectedPhone     Boolean         @default(false) @map("has_expected_phone")
+  hasExpectedAmount    Boolean         @default(false) @map("has_expected_amount")
+  hasPaymentCode       Boolean         @default(false) @map("has_payment_code")
+  paymentCodeChecked   String?         @map("payment_code_checked")
+  ocrWarnings          Json?           @map("ocr_warnings")
+  approvalStatus       String          @default("pending") @map("approval_status")
+  tokensGranted        Int?            @map("tokens_granted")
+  planTierGranted      String?         @map("plan_tier_granted")
+  billingMonthsGranted Int?            @map("billing_months_granted")
+  processedAt          DateTime?       @map("processed_at")
+  rejectionReason      String?         @map("rejection_reason")
+  billingAccount       BillingAccount? @relation(fields: [billingAccountId], references: [id])
+
+  @@index([createdAt])
+  @@index([approvalStatus])
+  @@map("receipt_verifications")
+}
+
+/// Payme to‘lovlari jurnali (status, summa tiyinda, sana, billing akkaunt).
+model PaymentTransaction {
+  id               String         @id @default(cuid())
+  paymeId          String         @unique @map("payme_id")
+  merchantTxnId    String         @unique @map("merchant_txn_id")
+  billingAccountId String         @map("billing_account_id")
+  amount           Int
+  status           String
+  paymeState       Int            @default(1) @map("payme_state")
+  planTier         String?        @map("plan_tier")
+  billingMonths    Int?           @map("billing_months")
+  metadata         Json?
+  performedAt      DateTime?      @map("performed_at")
+  cancelledAt      DateTime?      @map("cancelled_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@index([billingAccountId])
+  @@map("transactions")
+}
+
+model BillingProfile {
+  id               String         @id @default(cuid())
+  billingAccountId String         @unique @map("billing_account_id")
+  profileCompleted Boolean        @default(false) @map("profile_completed")
+  companyName      String?        @map("company_name")
+  taxVatId         String?        @map("tax_vat_id")
+  billingEmail     String?        @map("billing_email")
+  country          String?        @db.Char(2)
+  addressLine1     String?        @map("address_line1")
+  addressLine2     String?        @map("address_line2")
+  metadata         Json?
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  createdByUserId  String?        @map("created_by_user_id")
+  updatedByUserId  String?        @map("updated_by_user_id")
+  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@map("billing_profiles")
+}
+
+model WebsiteProject {
+  id               String                 @id @default(cuid())
+  publicSlug       String                 @unique @map("public_slug")
+  name             String
+  description      String?
+  status           WebsiteProjectStatus   @default(DRAFT)
+  defaultLocale    String?                @map("default_locale") @db.VarChar(16)
+  ownerUserId      String?                @map("owner_user_id")
+  billingAccountId String?                @map("billing_account_id")
+  legacySiteId     String?                @unique @map("legacy_site_id")
+  metadata         Json?
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  deletedAt        DateTime?              @map("deleted_at")
+  createdByUserId  String?                @map("created_by_user_id")
+  updatedByUserId  String?                @map("updated_by_user_id")
+  aiFailures       AiFailure[]
+  analyticsEvents  AnalyticsEvent[]       @relation("AnalyticsEventProject")
+  deployments      Deployment[]
+  exportArtifacts  ExportArtifact[]
+  generationJobs   GenerationJob[]
+  members          WebsiteProjectMember[]
+  billingAccount   BillingAccount?        @relation(fields: [billingAccountId], references: [id])
+  ownerUser        User?                  @relation("WebsiteProjectOwner", fields: [ownerUserId], references: [id])
+  versions         WebsiteVersion[]
+
+  @@index([ownerUserId])
+  @@index([billingAccountId])
+  @@index([status, updatedAt])
+  @@index([deletedAt])
+  @@map("website_projects")
+}
+
+model WebsiteProjectMember {
+  id        String                   @id @default(cuid())
+  projectId String                   @map("project_id")
+  userId    String                   @map("user_id")
+  role      WebsiteProjectMemberRole @default(EDITOR)
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+  project   WebsiteProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("website_project_members")
+}
+
+model WebsiteVersion {
+  id              String           @id @default(cuid())
+  projectId       String           @map("project_id")
+  version         Int
+  label           String?          @db.VarChar(200)
+  schemaJson      Json             @map("schema_json")
+  summary         String?
+  generationJobId String?          @unique @map("generation_job_id")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  createdByUserId String?          @map("created_by_user_id")
+  exportSources   ExportArtifact[]
+  generationJob   GenerationJob?   @relation(fields: [generationJobId], references: [id])
+  project         WebsiteProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("website_versions")
+}
+
+model GenerationJob {
+  id              String              @id @default(cuid())
+  projectId       String              @map("project_id")
+  kind            GenerationJobKind   @map("kind")
+  status          GenerationJobStatus @default(QUEUED) @map("status")
+  idempotencyKey  String?             @unique @map("idempotency_key") @db.VarChar(128)
+  inputSummary    String?             @map("input_summary")
+  inputPayload    Json?               @map("input_payload")
+  startedAt       DateTime?           @map("started_at")
+  completedAt     DateTime?           @map("completed_at")
+  attempts        Int                 @default(0) @map("attempts")
+  provider        String?             @db.VarChar(32)
+  model           String?             @db.VarChar(128)
+  errorCode       String?             @map("error_code") @db.VarChar(64)
+  errorMessage    String?             @map("error_message")
+  metadata        Json?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  createdByUserId String?             @map("created_by_user_id")
+  aiFailures      AiFailure[]
+  project         WebsiteProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  resultVersion   WebsiteVersion?
+
+  @@index([projectId, status, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("generation_jobs")
+}
+
+model ExportArtifact {
+  id              String               @id @default(cuid())
+  projectId       String               @map("project_id")
+  kind            ExportArtifactKind   @map("kind")
+  status          ExportArtifactStatus @default(PENDING) @map("status")
+  storagePath     String?              @map("storage_path") @db.VarChar(1024)
+  bytesSize       BigInt?              @map("bytes_size")
+  sha256          String?              @map("sha256") @db.VarChar(64)
+  downloadCount   Int                  @default(0) @map("download_count")
+  expiresAt       DateTime?            @map("expires_at")
+  sourceVersionId String?              @map("source_version_id")
+  metadata        Json?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  createdByUserId String?              @map("created_by_user_id")
+  project         WebsiteProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceVersion   WebsiteVersion?      @relation(fields: [sourceVersionId], references: [id])
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@map("export_artifacts")
+}
+
+model Deployment {
+  id              String             @id @default(cuid())
+  projectId       String             @map("project_id")
+  provider        DeploymentProvider @map("provider")
+  status          DeploymentStatus   @default(PENDING) @map("status")
+  externalId      String?            @map("external_id") @db.VarChar(256)
+  url             String?            @db.VarChar(2048)
+  branch          String?            @db.VarChar(256)
+  lastSyncedAt    DateTime?          @map("last_synced_at")
+  metadata        Json?
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  createdByUserId String?            @map("created_by_user_id")
+  project         WebsiteProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([provider, externalId])
+  @@index([status])
+  @@map("deployments")
+}
+
+model AnalyticsEvent {
+  id               String          @id @default(cuid())
+  eventName        String          @map("event_name") @db.VarChar(128)
+  userId           String?         @map("user_id")
+  billingAccountId String?         @map("billing_account_id")
+  projectId        String?         @map("project_id")
+  sessionId        String?         @map("session_id") @db.VarChar(128)
+  properties       Json?
+  ipHash           String?         @map("ip_hash") @db.VarChar(64)
+  userAgentHash    String?         @map("user_agent_hash") @db.VarChar(64)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  billingAccount   BillingAccount? @relation("AnalyticsEventBilling", fields: [billingAccountId], references: [id])
+  project          WebsiteProject? @relation("AnalyticsEventProject", fields: [projectId], references: [id])
+  user             User?           @relation("AnalyticsEventUser", fields: [userId], references: [id])
+
+  @@index([eventName, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([billingAccountId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("analytics_events")
+}
+
+model AiFailure {
+  id              String          @id @default(cuid())
+  generationJobId String?         @map("generation_job_id")
+  projectId       String?         @map("project_id")
+  stage           String          @db.VarChar(32)
+  errorCode       String          @map("error_code") @db.VarChar(64)
+  message         String
+  detail          Json?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  generationJob   GenerationJob?  @relation(fields: [generationJobId], references: [id])
+  project         WebsiteProject? @relation(fields: [projectId], references: [id])
+
+  @@index([generationJobId])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([errorCode, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("ai_failures")
+}
+
+model WebUser {
+  id                   String                @id @default(cuid())
+  email                String?               @unique @map("email") @db.VarChar(320)
+  phone                String?               @unique @map("phone") @db.VarChar(32)
+  /// scrypt-encoded hash only — never return to clients.
+  passwordHash         String?               @map("password_hash")
+  firstName            String                @default("") @map("first_name") @db.VarChar(120)
+  lastName             String                @default("") @map("last_name") @db.VarChar(120)
+  /// Platform role (USER | ADMIN). Distinct from admin panel cookie auth.
+  role                 String                @default("USER") @map("role") @db.VarChar(32)
+  isActive             Boolean               @default(true) @map("is_active")
+  lastLoginAt          DateTime?             @map("last_login_at")
+  sessionVersion       Int                   @default(0) @map("session_version")
+  linkedTelegramUserId String?               @unique @map("linked_telegram_user_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+  adminAuditLogsTarget AdminAuditLog[]       @relation("AuditWebTarget")
+  managedSubscriptions ManagedSubscription[] @relation("ManagedSubWeb")
+  linkedTelegramUser   User?                 @relation("TelegramWebLink", fields: [linkedTelegramUserId], references: [id])
+
+  @@index([email])
+  @@index([phone])
+  @@index([isActive])
+  @@map("web_users")
+}
+
+model ManagedSubscriptionPlan {
+  id                 String   @id @default(cuid())
+  slug               String   @unique @map("slug") @db.VarChar(64)
+  name               String   @map("name") @db.VarChar(200)
+  /// Price in minor units (e.g. UZS tiyin) for one billing period.
+  priceMinor         Int      @map("price_minor")
+  discountPriceMinor Int?     @map("discount_price_minor")
+  billingPeriodDays  Int      @default(30) @map("billing_period_days")
+  generationLimit    Int?     @map("generation_limit")
+  exportLimit        Int?     @map("export_limit")
+  isActive           Boolean  @default(true) @map("is_active")
+  sortOrder          Int      @default(0) @map("sort_order")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("managed_subscription_plans")
+}
+
+model ManagedSubscription {
+  id                 String                          @id @default(cuid())
+  telegramUserId     String?                         @map("telegram_user_id")
+  webUserId          String?                         @map("web_user_id")
+  billingAccountId   String?                         @map("billing_account_id")
+  planSlug           String                          @map("plan_slug") @db.VarChar(64)
+  planName           String                          @map("plan_name") @db.VarChar(200)
+  status             AdminManagedSubStatus           @default(ACTIVE)
+  source             AdminManagedSubSource
+  acquisitionChannel SubscriptionAcquisitionChannel? @map("acquisition_channel")
+  startsAt           DateTime                        @map("starts_at")
+  endsAt             DateTime?                       @map("ends_at")
+  priceAppliedMinor  Int?                            @map("price_applied_minor")
+  durationDays       Int?                            @map("duration_days")
+  adminNote          String?                         @map("admin_note")
+  grantedByActor     String                          @map("granted_by_actor") @db.VarChar(256)
+  createdAt          DateTime                        @default(now()) @map("created_at")
+  updatedAt          DateTime                        @updatedAt @map("updated_at")
+  auditLogs          AdminAuditLog[]                 @relation("AuditManagedSub")
+  billingAccount     BillingAccount?                 @relation("ManagedSubBilling", fields: [billingAccountId], references: [id])
+  telegramUser       User?                           @relation("ManagedSubTelegram", fields: [telegramUserId], references: [id], onDelete: Cascade)
+  webUser            WebUser?                        @relation("ManagedSubWeb", fields: [webUserId], references: [id], onDelete: Cascade)
+
+  @@index([telegramUserId, status])
+  @@index([webUserId, status])
+  @@index([startsAt, endsAt])
+  @@map("managed_subscriptions")
+}
+
+model AdminAuditLog {
+  id                    String               @id @default(cuid())
+  action                String               @map("action") @db.VarChar(64)
+  actor                 String               @map("actor") @db.VarChar(256)
+  targetTelegramUserId  String?              @map("target_telegram_user_id")
+  targetWebUserId       String?              @map("target_web_user_id")
+  managedSubscriptionId String?              @map("managed_subscription_id")
+  payload               Json?
+  createdAt             DateTime             @default(now()) @map("created_at")
+  managedSubscription   ManagedSubscription? @relation("AuditManagedSub", fields: [managedSubscriptionId], references: [id])
+  targetTelegramUser    User?                @relation("AuditTelegramTarget", fields: [targetTelegramUserId], references: [id])
+  targetWebUser         WebUser?             @relation("AuditWebTarget", fields: [targetWebUserId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("admin_audit_logs")
+}
 
 enum WebsiteProjectStatus {
   DRAFT
@@ -87,538 +527,4 @@ enum UserAuthSource {
   TELEGRAM
   WEB
   BOTH
-}
-
-// ---------------------------------------------------------------------------
-// Mavjud modellar (ustun nomlari o‘zgartirilmagan)
-// ---------------------------------------------------------------------------
-
-model User {
-  id           String   @id @default(cuid())
-  telegramId String   @unique
-  username     String?
-  firstName    String?
-  lastName     String?
-  languageCode String?
-  /// Telegram profil rasmi URL (Mini App `user.photo_url`).
-  telegramPhotoUrl String? @map("telegram_photo_url") @db.VarChar(1024)
-  authSource         UserAuthSource @default(TELEGRAM) @map("auth_source")
-  miniAppLastOpenedAt DateTime? @map("mini_app_last_opened_at")
-  /// Veb akkaunt bilan bog‘langan vaqt (xavfsiz linking flow).
-  telegramLinkedAt DateTime? @map("telegram_linked_at")
-  /// Mini App sessiyasini majburiy bekor qilish (force logout).
-  miniappSessionVersion Int @default(0) @map("miniapp_session_version")
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  sites                   Site[]
-  subscriptions           Subscription[]
-  ownedWebsiteProjects    WebsiteProject[]       @relation("WebsiteProjectOwner")
-  websiteProjectMembers   WebsiteProjectMember[]
-  analyticsEvents         AnalyticsEvent[]      @relation("AnalyticsEventUser")
-
-  linkedWebAccount       WebUser?               @relation("TelegramWebLink")
-  managedSubscriptions ManagedSubscription[]  @relation("ManagedSubTelegram")
-  adminAuditLogsTarget   AdminAuditLog[]        @relation("AuditTelegramTarget")
-}
-
-model Subscription {
-  id             String    @id @default(cuid())
-  userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan           String
-  billingMonths  Int       @default(1)
-  siteTokenLimit Int       @default(5)
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-
-  @@index([userId])
-}
-
-model Site {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title      String
-  slug       String
-  schemaJson Json
-  summary    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([userId, slug])
-  @@index([userId])
-}
-
-model TelegramSession {
-  key       String   @id
-  value     String   @db.Text
-  updatedAt DateTime @updatedAt
-}
-
-/// Web-builder uchun Payme hisobi; Payme `account.user_id` shu id bilan yuboriladi.
-model BillingAccount {
-  id                String   @id @default(cuid())
-  tokenBalance      Int      @default(0) @map("token_balance")
-  planTier          String   @default("basic")
-  subscriptionUntil DateTime?
-  notifyTelegramId  String?  @map("notify_telegram_id")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  transactions         PaymentTransaction[]
-  receiptPaymentCodes  ReceiptPaymentCode[]
-  receiptVerifications ReceiptVerification[]
-  websiteProjects      WebsiteProject[]
-  billingProfile       BillingProfile?
-  analyticsEvents      AnalyticsEvent[] @relation("AnalyticsEventBilling")
-  managedSubscriptions ManagedSubscription[] @relation("ManagedSubBilling")
-
-  @@map("billing_accounts")
-}
-
-/// Qo‘lda to‘lov: Payme «Izoh»da ko‘rsatiladigan yagona kod (masalan Usta-7782).
-model ReceiptPaymentCode {
-  id                String         @id @default(cuid())
-  code              String         @unique
-  billingAccountId  String         @map("billing_account_id")
-  billingAccount    BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
-  planTier          String         @map("plan_tier")
-  billingMonths     Int            @map("billing_months")
-  expectedAmountUzs Int            @map("expected_amount_uzs")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  expiresAt         DateTime       @map("expires_at")
-  usedAt            DateTime?      @map("used_at")
-
-  @@index([billingAccountId, expiresAt])
-  @@map("receipt_payment_codes")
-}
-
-/// Yuklangan chek: EXIF + OCR tekshiruvi natijalari (admin ko‘radi).
-model ReceiptVerification {
-  id                 String    @id @default(cuid())
-  createdAt          DateTime  @default(now()) @map("created_at")
-  billingAccountId   String?   @map("billing_account_id")
-  billingAccount     BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
-  originalFileName   String    @map("original_file_name")
-  mimeType           String    @map("mime_type")
-  storagePath        String    @map("storage_path")
-
-  exifSoftware     String? @map("exif_software")
-  suspiciousEdit   Boolean @default(false) @map("suspicious_edit")
-
-  ocrRaw             String? @db.Text @map("ocr_raw")
-  hasExpectedPhone   Boolean @default(false) @map("has_expected_phone")
-  hasExpectedAmount  Boolean @default(false) @map("has_expected_amount")
-  hasPaymentCode     Boolean @default(false) @map("has_payment_code")
-  paymentCodeChecked String? @map("payment_code_checked")
-
-  ocrWarnings Json? @map("ocr_warnings")
-
-  approvalStatus       String    @default("pending") @map("approval_status")
-  tokensGranted        Int?      @map("tokens_granted")
-  planTierGranted      String?   @map("plan_tier_granted")
-  billingMonthsGranted Int?      @map("billing_months_granted")
-  processedAt          DateTime? @map("processed_at")
-  rejectionReason      String?   @db.Text @map("rejection_reason")
-
-  @@index([createdAt])
-  @@index([approvalStatus])
-  @@map("receipt_verifications")
-}
-
-/// Payme to‘lovlari jurnali (status, summa tiyinda, sana, billing akkaunt).
-model PaymentTransaction {
-  id               String         @id @default(cuid())
-  paymeId          String         @unique @map("payme_id")
-  merchantTxnId    String         @unique @map("merchant_txn_id")
-  billingAccountId String         @map("billing_account_id")
-  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
-  amount           Int
-  status           String
-  paymeState       Int            @default(1) @map("payme_state")
-  planTier         String?        @map("plan_tier")
-  billingMonths    Int?           @map("billing_months")
-  metadata         Json?
-  performedAt      DateTime?      @map("performed_at")
-  cancelledAt      DateTime?      @map("cancelled_at")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-
-  @@index([billingAccountId])
-  @@map("transactions")
-}
-
-// ---------------------------------------------------------------------------
-// Billing readiness (SaaS)
-// ---------------------------------------------------------------------------
-
-model BillingProfile {
-  id               String         @id @default(cuid())
-  billingAccountId String         @unique @map("billing_account_id")
-  billingAccount   BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
-
-  profileCompleted Boolean @default(false) @map("profile_completed")
-  companyName      String? @map("company_name")
-  taxVatId          String? @map("tax_vat_id")
-  billingEmail      String? @map("billing_email")
-  country           String? @db.Char(2)
-  addressLine1      String? @map("address_line1")
-  addressLine2      String? @map("address_line2")
-  metadata          Json?
-
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  createdByUserId   String?  @map("created_by_user_id")
-  updatedByUserId   String?  @map("updated_by_user_id")
-
-  @@map("billing_profiles")
-}
-
-// ---------------------------------------------------------------------------
-// Website projects & versions
-// ---------------------------------------------------------------------------
-
-model WebsiteProject {
-  id               String               @id @default(cuid())
-  publicSlug       String               @unique @map("public_slug")
-  name             String
-  description      String?              @db.Text
-  status           WebsiteProjectStatus @default(DRAFT)
-  defaultLocale    String?              @map("default_locale") @db.VarChar(16)
-
-  ownerUserId      String?              @map("owner_user_id")
-  ownerUser        User?                @relation("WebsiteProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  billingAccountId String?              @map("billing_account_id")
-  billingAccount   BillingAccount?      @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
-
-  legacySiteId     String?              @unique @map("legacy_site_id")
-
-  metadata         Json?
-
-  createdAt        DateTime             @default(now()) @map("created_at")
-  updatedAt        DateTime             @updatedAt @map("updated_at")
-  deletedAt        DateTime?            @map("deleted_at")
-  createdByUserId  String?              @map("created_by_user_id")
-  updatedByUserId  String?              @map("updated_by_user_id")
-
-  versions         WebsiteVersion[]
-  generationJobs   GenerationJob[]
-  exportArtifacts  ExportArtifact[]
-  deployments      Deployment[]
-  analyticsEvents  AnalyticsEvent[]     @relation("AnalyticsEventProject")
-  members          WebsiteProjectMember[]
-  aiFailures       AiFailure[]
-
-  @@index([ownerUserId])
-  @@index([billingAccountId])
-  @@index([status, updatedAt])
-  @@index([deletedAt])
-  @@map("website_projects")
-}
-
-model WebsiteProjectMember {
-  id        String                   @id @default(cuid())
-  projectId String                   @map("project_id")
-  project   WebsiteProject           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  userId    String                   @map("user_id")
-  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      WebsiteProjectMemberRole @default(EDITOR)
-
-  createdAt DateTime                 @default(now()) @map("created_at")
-  updatedAt DateTime                 @updatedAt @map("updated_at")
-
-  @@unique([projectId, userId])
-  @@index([userId])
-  @@map("website_project_members")
-}
-
-model WebsiteVersion {
-  id              String         @id @default(cuid())
-  projectId       String         @map("project_id")
-  project         WebsiteProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  version         Int
-  label           String?        @db.VarChar(200)
-  schemaJson      Json           @map("schema_json")
-  summary         String?        @db.Text
-
-  generationJobId String?        @unique @map("generation_job_id")
-  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
-
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  createdByUserId String?        @map("created_by_user_id")
-
-  exportSources   ExportArtifact[]
-
-  @@unique([projectId, version])
-  @@index([projectId, createdAt(sort: Desc)])
-  @@map("website_versions")
-}
-
-model GenerationJob {
-  id             String              @id @default(cuid())
-  projectId      String              @map("project_id")
-  project        WebsiteProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  kind           GenerationJobKind   @map("kind")
-  status         GenerationJobStatus @default(QUEUED) @map("status")
-
-  idempotencyKey String?             @unique @map("idempotency_key") @db.VarChar(128)
-
-  inputSummary   String?             @map("input_summary") @db.Text
-  inputPayload   Json?               @map("input_payload")
-
-  startedAt      DateTime?           @map("started_at")
-  completedAt    DateTime?           @map("completed_at")
-  attempts       Int                 @default(0) @map("attempts")
-
-  provider       String?             @db.VarChar(32)
-  model          String?             @db.VarChar(128)
-
-  errorCode      String?             @map("error_code") @db.VarChar(64)
-  errorMessage   String?             @map("error_message") @db.Text
-
-  metadata       Json?
-
-  createdAt      DateTime            @default(now()) @map("created_at")
-  updatedAt      DateTime            @updatedAt @map("updated_at")
-  createdByUserId String?          @map("created_by_user_id")
-
-  resultVersion  WebsiteVersion?
-  aiFailures     AiFailure[]
-
-  @@index([projectId, status, createdAt(sort: Desc)])
-  @@index([status, createdAt])
-  @@map("generation_jobs")
-}
-
-// ---------------------------------------------------------------------------
-// Exports & deployments
-// ---------------------------------------------------------------------------
-
-model ExportArtifact {
-  id              String               @id @default(cuid())
-  projectId       String               @map("project_id")
-  project         WebsiteProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  kind            ExportArtifactKind   @map("kind")
-  status          ExportArtifactStatus @default(PENDING) @map("status")
-
-  storagePath     String?              @map("storage_path") @db.VarChar(1024)
-  bytesSize       BigInt?              @map("bytes_size")
-  sha256          String?              @map("sha256") @db.VarChar(64)
-  downloadCount   Int                  @default(0) @map("download_count")
-  expiresAt       DateTime?            @map("expires_at")
-
-  sourceVersionId String?              @map("source_version_id")
-  sourceVersion   WebsiteVersion?      @relation(fields: [sourceVersionId], references: [id], onDelete: SetNull)
-
-  metadata        Json?
-
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
-  createdByUserId String?              @map("created_by_user_id")
-
-  @@index([projectId, createdAt(sort: Desc)])
-  @@index([status, expiresAt])
-  @@map("export_artifacts")
-}
-
-model Deployment {
-  id              String             @id @default(cuid())
-  projectId       String             @map("project_id")
-  project         WebsiteProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  provider        DeploymentProvider @map("provider")
-  status          DeploymentStatus   @default(PENDING) @map("status")
-
-  externalId      String?            @map("external_id") @db.VarChar(256)
-  url             String?            @db.VarChar(2048)
-  branch          String?            @db.VarChar(256)
-
-  lastSyncedAt    DateTime?          @map("last_synced_at")
-  metadata        Json?
-
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  createdByUserId String?            @map("created_by_user_id")
-
-  @@index([projectId, createdAt(sort: Desc)])
-  @@index([provider, externalId])
-  @@index([status])
-  @@map("deployments")
-}
-
-// ---------------------------------------------------------------------------
-// Analytics & AI failures
-// ---------------------------------------------------------------------------
-
-model AnalyticsEvent {
-  id               String   @id @default(cuid())
-  eventName        String   @map("event_name") @db.VarChar(128)
-
-  userId           String?  @map("user_id")
-  user             User?    @relation("AnalyticsEventUser", fields: [userId], references: [id], onDelete: SetNull)
-  billingAccountId String?  @map("billing_account_id")
-  billingAccount   BillingAccount? @relation("AnalyticsEventBilling", fields: [billingAccountId], references: [id], onDelete: SetNull)
-  projectId        String?  @map("project_id")
-  project          WebsiteProject? @relation("AnalyticsEventProject", fields: [projectId], references: [id], onDelete: SetNull)
-
-  sessionId        String?  @map("session_id") @db.VarChar(128)
-  properties       Json?
-  ipHash           String?  @map("ip_hash") @db.VarChar(64)
-  userAgentHash    String?  @map("user_agent_hash") @db.VarChar(64)
-
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  @@index([eventName, createdAt(sort: Desc)])
-  @@index([projectId, createdAt(sort: Desc)])
-  @@index([userId, createdAt(sort: Desc)])
-  @@index([billingAccountId, createdAt(sort: Desc)])
-  @@index([createdAt(sort: Desc)])
-  @@map("analytics_events")
-}
-
-model AiFailure {
-  id              String         @id @default(cuid())
-  generationJobId String?        @map("generation_job_id")
-  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id], onDelete: SetNull)
-
-  projectId       String?        @map("project_id")
-  project         WebsiteProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  stage           String         @db.VarChar(32)
-  errorCode       String         @map("error_code") @db.VarChar(64)
-  message         String         @db.Text
-  detail          Json?
-
-  createdAt       DateTime       @default(now()) @map("created_at")
-
-  @@index([generationJobId])
-  @@index([projectId, createdAt(sort: Desc)])
-  @@index([errorCode, createdAt(sort: Desc)])
-  @@index([createdAt(sort: Desc)])
-  @@map("ai_failures")
-}
-
-// ---------------------------------------------------------------------------
-// Website accounts & admin subscription catalog (hashed passwords only)
-// ---------------------------------------------------------------------------
-
-model WebUser {
-  id       String  @id @default(cuid())
-  email    String? @unique @map("email") @db.VarChar(320)
-  phone    String? @unique @map("phone") @db.VarChar(32)
-  /// scrypt-encoded hash only — never return to clients.
-  passwordHash String? @map("password_hash") @db.Text
-
-  firstName String @default("") @map("first_name") @db.VarChar(120)
-  lastName  String @default("") @map("last_name") @db.VarChar(120)
-  /// Platform role (USER | ADMIN). Distinct from admin panel cookie auth.
-  role      String @default("USER") @map("role") @db.VarChar(32)
-
-  isActive       Boolean   @default(true) @map("is_active")
-  lastLoginAt    DateTime? @map("last_login_at")
-  sessionVersion Int       @default(0) @map("session_version")
-
-  linkedTelegramUserId String? @unique @map("linked_telegram_user_id")
-  linkedTelegramUser   User?   @relation("TelegramWebLink", fields: [linkedTelegramUserId], references: [id], onDelete: SetNull)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  managedSubscriptions ManagedSubscription[] @relation("ManagedSubWeb")
-  adminAuditLogsTarget AdminAuditLog[]      @relation("AuditWebTarget")
-
-  @@index([email])
-  @@index([phone])
-  @@index([isActive])
-  @@map("web_users")
-}
-
-model ManagedSubscriptionPlan {
-  id     String @id @default(cuid())
-  slug   String @unique @map("slug") @db.VarChar(64)
-  name   String @map("name") @db.VarChar(200)
-  /// Price in minor units (e.g. UZS tiyin) for one billing period.
-  priceMinor         Int  @map("price_minor")
-  discountPriceMinor Int? @map("discount_price_minor")
-  billingPeriodDays  Int  @default(30) @map("billing_period_days")
-
-  generationLimit Int? @map("generation_limit")
-  exportLimit     Int? @map("export_limit")
-
-  isActive  Boolean @default(true) @map("is_active")
-  sortOrder Int     @default(0) @map("sort_order")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([isActive, sortOrder])
-  @@map("managed_subscription_plans")
-}
-
-model ManagedSubscription {
-  id String @id @default(cuid())
-
-  telegramUserId String? @map("telegram_user_id")
-  telegramUser   User?   @relation("ManagedSubTelegram", fields: [telegramUserId], references: [id], onDelete: Cascade)
-
-  webUserId String?  @map("web_user_id")
-  webUser   WebUser? @relation("ManagedSubWeb", fields: [webUserId], references: [id], onDelete: Cascade)
-
-  billingAccountId String?         @map("billing_account_id")
-  billingAccount   BillingAccount? @relation("ManagedSubBilling", fields: [billingAccountId], references: [id], onDelete: SetNull)
-
-  planSlug String @map("plan_slug") @db.VarChar(64)
-  planName String @map("plan_name") @db.VarChar(200)
-
-  status AdminManagedSubStatus @default(ACTIVE)
-  source AdminManagedSubSource
-
-  acquisitionChannel SubscriptionAcquisitionChannel? @map("acquisition_channel")
-
-  startsAt DateTime  @map("starts_at")
-  endsAt   DateTime? @map("ends_at")
-
-  priceAppliedMinor Int? @map("price_applied_minor")
-  durationDays      Int? @map("duration_days")
-  adminNote         String? @map("admin_note") @db.Text
-  grantedByActor    String  @map("granted_by_actor") @db.VarChar(256)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  auditLogs AdminAuditLog[] @relation("AuditManagedSub")
-
-  @@index([telegramUserId, status])
-  @@index([webUserId, status])
-  @@index([startsAt, endsAt])
-  @@map("managed_subscriptions")
-}
-
-model AdminAuditLog {
-  id     String @id @default(cuid())
-  action String @map("action") @db.VarChar(64)
-  actor  String @map("actor") @db.VarChar(256)
-
-  targetTelegramUserId String? @map("target_telegram_user_id")
-  targetTelegramUser   User?   @relation("AuditTelegramTarget", fields: [targetTelegramUserId], references: [id], onDelete: SetNull)
-
-  targetWebUserId String?  @map("target_web_user_id")
-  targetWebUser   WebUser? @relation("AuditWebTarget", fields: [targetWebUserId], references: [id], onDelete: SetNull)
-
-  managedSubscriptionId String?              @map("managed_subscription_id")
-  managedSubscription   ManagedSubscription? @relation("AuditManagedSub", fields: [managedSubscriptionId], references: [id], onDelete: SetNull)
-
-  payload Json?
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([createdAt(sort: Desc)])
-  @@index([action, createdAt(sort: Desc)])
-  @@map("admin_audit_logs")
 }

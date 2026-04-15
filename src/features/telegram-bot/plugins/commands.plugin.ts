@@ -5,6 +5,8 @@ import type { BotContext } from "../context";
 import { sendStartWelcome } from "../handlers/send-start-welcome";
 import { buildSiteActionsKeyboard } from "../lib/site-inline-keyboards";
 import { telegramMiniAppUrl } from "@/lib/telegram/miniapp-url";
+import { consumeAccountLinkChallenge, parseTelegramStartLinkPayload } from "@/lib/auth/telegram-web-link.service";
+
 import { listSitesForUser } from "../services/site.service";
 import { findUserByTelegramId, upsertUserFromTelegramContext } from "../services/user.service";
 
@@ -26,7 +28,25 @@ const HELP_UZ = [
  */
 export function registerCommandPlugin(bot: Bot<BotContext>): void {
   bot.command("start", async (ctx) => {
-    await upsertUserFromTelegramContext(ctx);
+    const userRow = await upsertUserFromTelegramContext(ctx);
+    const text = ctx.message && "text" in ctx.message ? ctx.message.text : "";
+    const parts = text.trim().split(/\s+/);
+    const startPayload = parts[1];
+    const rawLink = parseTelegramStartLinkPayload(startPayload);
+    if (rawLink) {
+      const res = await consumeAccountLinkChallenge(rawLink, userRow.id, userRow.telegramId);
+      if (res.ok) {
+        await ctx.reply(
+          res.alreadyLinked
+            ? "✅ Bu Telegram akkaunti allaqachon veb kabinetingiz bilan bog‘langan."
+            : "✅ Veb akkauntingiz Telegram bilan muvaffaqiyatli bog‘landi. Endi Mini App va saytdan bir xil obuna/limitlardan foydalanasiz.",
+        );
+      } else {
+        await ctx.reply(
+          "❌ Bog‘lash havolasi eskirgan, noto‘g‘ri yoki boshqa akkaunt allaqachon bog‘langan. Veb-saytdan yangi havola oling.",
+        );
+      }
+    }
     await sendStartWelcome(ctx);
   });
 

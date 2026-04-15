@@ -14,6 +14,8 @@
     "lint": "node ./node_modules/next/dist/bin/next lint",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
     "receipts:venv": "python3 -m venv .venv-receipts && .venv-receipts/bin/pip install -U pip && .venv-receipts/bin/pip install -r requirements-receipts.txt",
     "telegram:dev": "tsx --conditions react-server --env-file=.env scripts/telegram-dev.ts",
     "test": "vitest run",

@@ -28,6 +28,42 @@ function tierFromPlanSlug(slug: string): SchemaPlanTier {
   return "basic";
 }
 
+async function resolveTierForWebUser(webUserId: string): Promise<SchemaPlanTier> {
+  const wu = await prisma.webUser.findUnique({
+    where: { id: webUserId },
+    select: { billingAccountId: true, linkedTelegramUserId: true },
+  });
+  if (!wu) {
+    return "basic";
+  }
+  if (wu.billingAccountId) {
+    const acc = await prisma.billingAccount.findUnique({ where: { id: wu.billingAccountId } });
+    if (acc?.subscriptionUntil && acc.subscriptionUntil.getTime() > Date.now()) {
+      const t = acc.planTier.trim().toLowerCase();
+      if (t === "pro") return "pro";
+      if (t === "premium") return "premium";
+      return "basic";
+    }
+  }
+  const now = new Date();
+  const sub = await prisma.managedSubscription.findFirst({
+    where: {
+      webUserId,
+      status: "ACTIVE",
+      OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { planSlug: true },
+  });
+  if (sub) {
+    return tierFromPlanSlug(sub.planSlug);
+  }
+  if (wu.linkedTelegramUserId) {
+    return resolveTierForMiniappUser(wu.linkedTelegramUserId);
+  }
+  return "basic";
+}
+
 async function resolveTierForMiniappUser(userId: string): Promise<SchemaPlanTier> {
   const u = await prisma.user.findUnique({
     where: { id: userId },
@@ -86,10 +122,12 @@ export async function resolveSchemaPlanTierForRequest(): Promise<SchemaPlanTier>
     }
   }
 
-  const builderRaw = jar.get(BUILDER_SESSION_COOKIE)?.value;
-  const p = builderRaw ? parseBuilderSessionToken(builderRaw) : null;
-  if (!p) {
+  const p = parseBuilderCookiePayload();
+  if (!p || !(await isBuilderSessionAllowedForAi())) {
     return "basic";
+  }
+  if (p.webUserId) {
+    return resolveTierForWebUser(p.webUserId);
   }
   if (p.billingId) {
     const acc = await prisma.billingAccount.findUnique({ where: { id: p.billingId } });
@@ -103,14 +141,29 @@ export async function resolveSchemaPlanTierForRequest(): Promise<SchemaPlanTier>
   return p.tier;
 }
 
-function hasAdminOrBuilderSessionSync(): boolean {
-  const jar = cookies();
-  const adminRaw = jar.get(ADMIN_SESSION_COOKIE)?.value;
-  if (adminRaw && verifyAdminSessionToken(adminRaw)) {
+function parseBuilderCookiePayload() {
+  const builderRaw = cookies().get(BUILDER_SESSION_COOKIE)?.value;
+  return builderRaw ? parseBuilderSessionToken(builderRaw) : null;
+}
+
+function hasAdminSessionSync(): boolean {
+  const adminRaw = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  return Boolean(adminRaw && verifyAdminSessionToken(adminRaw));
+}
+
+async function isBuilderSessionAllowedForAi(): Promise<boolean> {
+  const p = parseBuilderCookiePayload();
+  if (!p) {
+    return false;
+  }
+  if (!p.webUserId) {
     return true;
   }
-  const builderRaw = jar.get(BUILDER_SESSION_COOKIE)?.value;
-  return Boolean(builderRaw && parseBuilderSessionToken(builderRaw));
+  const wu = await prisma.webUser.findUnique({
+    where: { id: p.webUserId },
+    select: { sessionVersion: true, isActive: true },
+  });
+  return Boolean(wu?.isActive && wu.sessionVersion === p.webSessionVersion);
 }
 
 async function hasValidMiniappSession(): Promise<boolean> {
@@ -130,7 +183,11 @@ async function hasValidMiniappSession(): Promise<boolean> {
 }
 
 async function hasElevatedWebsiteAiSession(): Promise<boolean> {
-  if (hasAdminOrBuilderSessionSync()) {
+  if (hasAdminSessionSync()) {
+    return true;
+  }
+  const p = parseBuilderCookiePayload();
+  if (p && (await isBuilderSessionAllowedForAi())) {
     return true;
   }
   return hasValidMiniappSession();
