@@ -4,7 +4,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.ai_generation.services import GeminiService, DeepSeekService, AIRouterService
+from apps.ai_generation.services import ClaudeService, AIRouterService
 from apps.accounts.models import User
 from apps.exports.services import ExportService
 from .models import ProjectStatus, WebsiteProject, ProjectVersion
@@ -39,17 +39,17 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
         intent = AIRouterService.detect_intent(prompt)
         
         try:
-            if intent == "DEEPSEEK":
+            if intent == "CHAT":
                 # CHAT MODE
-                chat_api = DeepSeekService()
+                chat_api = ClaudeService()
                 chat_res = chat_api.chat(prompt)
                 return Response({
-                    "success": True, "ai_type": "DEEPSEEK", "message": chat_res, "is_chat": True
+                    "success": True, "ai_type": "CLAUDE", "message": chat_res, "is_chat": True
                 })
 
             else:
-                # GENERATION MODE (GEMINI)
-                gemini = GeminiService()
+                # GENERATION MODE (CLAUDE)
+                gemini = ClaudeService()
                 if project_id:
                     project = WebsiteProject.objects.get(id=project_id)
                     new_schema = gemini.revise_site(prompt, project.schema_data, language)
@@ -72,7 +72,7 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                     )
 
                 return Response({
-                    "success": True, "ai_type": "GEMINI", "project": WebsiteProjectSerializer(project).data, "is_chat": False
+                    "success": True, "ai_type": "CLAUDE", "project": WebsiteProjectSerializer(project).data, "is_chat": False
                 })
 
         except Exception as e:
