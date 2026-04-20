@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "title": "Antigravity – Kelajak Texnologiyalari",
+    "description": "Futuristik levitatsiya va kosmik transportni kashf eting. Zamonaviy, minimalistik va qorong‘u rejimli veb-sayt.",
+    "colorPalette": {
+      "primary": "#0A0A0A",
+      "background": "#0F0F0F",
+      "accent": "#00FFFF",
+      "text": "#E0E0E0"
+    }
+  },
+  "navigation": {
+    "logo": "Antigravity",
+    "links": ["Home", "Technology", "Products", "About", "Contact"]
+  },
+  "pages": {
+    "Home": {
+      "hero": {
+        "title": "Antigravity – Kelajakka uchish",
+        "subtitle": "Levitatsiya texnologiyasi bilan olamning chegaralarini yengib chiqing",
+        "ctaButton": "Ko‘proq bilish"
+      },
+      "howItWorks": {
+        "sectionTitle": "Qanday ishlaydi?",
+        "description": "Magnetik maydon va antigravitatsiya motorlari asosida tasavvur qilinmagan yuqoriga ko‘tarilishlarni ta’minlaydi."
+      },
+      "achievements": {
+        "sectionTitle": "Asosiy yutuqlar",
+        "gridItems": [
+          {"title": "10,000+ foydalanuvchi", "description": "Dunyo bo‘ylab foydalanuvchilar"},
+          {"title": "1000+ km/s tezlik", "description": "Kosmik transport uchun"},
+          {"title": "Patenti olingan texnika", "description": "Xalqaro standartlarga mos"},
+          {"title": "3 yil davomida barqarorlik", "description": "Kutilgan xizmat muddati"}
+        ]
+      }
+    },
+    "Technology": {
+      "sectionTitle": "Texnologiya",
+      "blocks": [
+        {"title": "Magnitli levitatsiya", "content": "Kuchli superkonduktorli magnitlar yordamida yer qobig‘ini mag‘rurlaydi."},
+        {"title": "Antigravitatsiya dvigatellari", "content": "Quantum‑field nazariyasiga asoslangan energetik dvigatellar."}
+      ]
+    },
+    "Products": {
+      "sectionTitle": "Mahsulotlar",
+      "items": [
+        {"name": "Hover‑Board", "description": "Shaxsiy levitatsiya boardi, 20 km/soatga yetadi."},
+        {"name": "Heavy‑Lifter", "description": "Yuk tashish uchun 5 tonnaga qadar ko‘taradi."},
+        {"name": "Sky‑Pod", "description": "Kosmik turistik kapsula, 48 soat davomida orbitada."}
+      ]
+    },
+    "About": {
+      "sectionTitle": "Biz haqimizda",
+      "content": "Antigravity – ilm-fan va muhandislikni birlashtirgan, insoniyatni yangi bosqichga olib chiqadigan brend."
+    },
+    "Contact": {
+      "sectionTitle": "Aloqa",
+      "fields": ["Ism", "Email", "Xabar"],
+      "submitButton": "Yuborish"
+    }
+  },
+  "components": {
+    "hero": {
+      "container": "flex flex-col items-center justify-center min-h-screen bg-gray-900 text-center text-[#00FFFF]",
+      "title": "text-5xl md:text-7xl font-bold",
+      "subtitle": "text-xl md:text-2xl mt-4",
+      "ctaButton": "mt-8 px-6 py-3 bg-[#00FFFF] text-gray-900 font-semibold rounded hover:bg-[#00e5e5] transition"
+    },
+    "sectionTitle": {
+      "container": "my-12 text-center",
+      "title": "text-3xl md:text-4xl font-semibold text-[#00FFFF]",
+      "subtitle": "text-lg md:text-xl text-gray-300 mt-2"
+    },
+    "gridItem": {
+      "container": "p-6 bg-gray-800 rounded-lg shadow-lg hover:shadow-neon transition",
+      "title": "text-xl font-medium text-[#00FFFF]",
+      "description": "text-gray-200 mt-2"
+    },
+    "techBlock": {
+      "container": "flex flex-col md:flex-row items-start gap-6 p-8 bg-gray-800 rounded",
+      "title": "text-2xl font-bold text-[#00FFFF]",
+      "content": "text-gray-200 mt-3"
+    },
+    "productCard": {
+      "container": "border border-gray-700 rounded-lg p-6 bg-gray-900 hover:border-[#00FFFF] transition",
+      "name": "text-2xl font-semibold text-[#00FFFF]",
+      "description": "text-gray-300 mt-2",
+      "ctaButton": "mt-4 inline-block px-4 py-2 bg-[#00FFFF] text-gray-900 rounded hover:bg-[#00e5e5]"
+    },
+    "button": {
+      "base": "px-4 py-2 bg-[#00FFFF] text-gray-900 rounded hover:bg-[#00e5e5] transition",
+      "primary": "bg-[#00FFFF] text-gray-900",
+      "secondary": "bg-gray-800 text-[#00FFFF] border border-[#00FFFF]"
+    }
+  }
+}

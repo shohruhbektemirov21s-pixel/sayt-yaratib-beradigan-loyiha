@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import api from '@/shared/api/axios';
 import { useAuthStore } from '@/store/authStore';
+import axios from 'axios';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -33,8 +33,12 @@ export default function LoginPage() {
       
       setAuth(userResponse.data, access);
       router.push('/builder');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid credentials');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setError((err.response?.data as { detail?: string } | undefined)?.detail || err.message || 'Invalid credentials');
+      } else {
+        setError('Invalid credentials');
+      }
     } finally {
       setLoading(false);
     }

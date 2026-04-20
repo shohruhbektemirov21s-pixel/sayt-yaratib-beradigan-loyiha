@@ -145,8 +145,8 @@ CHANNEL_LAYERS = {
 CORS_ALLOW_ALL_ORIGINS = True # Change for production
 
 # Gemini
+GEMINI_MODEL = env("GOOGLE_GENERATIVE_AI_MODEL", default="gemini-flash-latest")
 GEMINI_API_KEY = env("GOOGLE_GENERATIVE_AI_API_KEY", default="")
-
 # SPECTACULAR SETTINGS
 SPECTACULAR_SETTINGS = {
     'TITLE': 'AI Website Builder API',

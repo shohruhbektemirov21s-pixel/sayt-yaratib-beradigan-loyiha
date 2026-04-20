@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Sparkles, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/routing';
 import api from '@/shared/api/axios';
+import axios from 'axios';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -28,8 +28,13 @@ export default function RegisterPage() {
         full_name: fullName 
       });
       router.push('/login');
-    } catch (err: any) {
-      setError(Object.values(err.response?.data || {}).join(' ') || 'Registration failed');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const payload = err.response?.data as Record<string, unknown> | undefined;
+        setError(Object.values(payload || {}).join(' ') || err.message || 'Registration failed');
+      } else {
+        setError('Registration failed');
+      }
     } finally {
       setLoading(false);
     }

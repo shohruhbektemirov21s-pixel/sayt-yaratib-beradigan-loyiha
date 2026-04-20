@@ -10,9 +10,10 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     ordering = ["email"]
     
     # Unfold requires specific fieldsets matching auth.User
+    # Custom fieldsets for the custom User model (no username field)
     fieldsets = (
-        (None, {"fields": ("username", "password")}),
-        ("Personal info", {"fields": ("full_name", "email", "avatar")}),
+        (None, {"fields": ("email", "password")}),
+        ("Personal info", {"fields": ("full_name", "role")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )

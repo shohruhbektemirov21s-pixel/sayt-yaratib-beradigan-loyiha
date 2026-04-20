@@ -42,7 +42,7 @@ class FullWebsiteSchema(BaseModel):
 class GeminiService:
     def __init__(self):
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
     def generate_blueprint(self, prompt: str, language: str = 'en') -> Dict:
         """Step 1 AI Generation: Analyze intent and create a structure."""
