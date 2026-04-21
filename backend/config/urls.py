@@ -13,11 +13,12 @@ ADMIN_URL = env("ADMIN_URL", default="17210707admin")
 
 
 def _staff_required(view):
-    """Admin panelga faqat is_staff=True foydalanuvchilar kira oladi."""
+    """Login qilingan user is_staff=True bo'lmasa — 403."""
     def wrapper(request, *args, **kwargs):
+        # Anonim foydalanuvchiga Django admin login sahifasini ko'rsatamiz
+        # (admin'ning o'z login view'i autentifikatsiyani boshqaradi).
         if not request.user.is_authenticated:
-            from django.contrib.auth.views import redirect_to_login
-            return redirect_to_login(request.get_full_path())
+            return view(request, *args, **kwargs)
         if not request.user.is_staff:
             return HttpResponseForbidden(
                 b"<h1>403 Forbidden</h1><p>Ruxsat yo'q.</p>"
@@ -36,6 +37,7 @@ urlpatterns = [
     path("api/accounts/", include("apps.accounts.urls")),
     path("api/subscriptions/", include("apps.subscriptions.urls")),
     path("api/projects/", include("apps.website_projects.urls")),
+    path("api/conversations/", include(("apps.website_projects.conversation_urls", "conversations"), namespace="conversations")),
     path("api/ai/", include("apps.ai_generation.urls")),
     path("api/payments/", include("apps.payments.urls")),
 

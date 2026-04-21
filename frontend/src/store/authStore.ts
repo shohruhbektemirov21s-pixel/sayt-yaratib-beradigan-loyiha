@@ -7,6 +7,8 @@ interface User {
   full_name: string;
   role: string;
   is_staff?: boolean;
+  tokens_balance?: number;
+  nano_coins?: number;
 }
 
 interface AuthState {
@@ -15,6 +17,7 @@ interface AuthState {
   tokenExpiresAt: number | null;    // Unix ms
   isAuthenticated: boolean;
   setAuth: (user: User, token: string, expiresInSeconds?: number) => void;
+  updateBalance: (tokens: number, nanoCoins: number) => void;
   logout: () => void;
   isTokenExpired: () => boolean;
 }
@@ -35,6 +38,12 @@ export const useAuthStore = create<AuthState>()(
           ? expiresInSeconds * 1000
           : ACCESS_TOKEN_LIFETIME_MS);
         set({ user, token, tokenExpiresAt: expiresAt, isAuthenticated: true });
+      },
+
+      updateBalance: (tokens, nanoCoins) => {
+        const current = get().user;
+        if (!current) return;
+        set({ user: { ...current, tokens_balance: tokens, nano_coins: nanoCoins } });
       },
 
       logout: () => set({

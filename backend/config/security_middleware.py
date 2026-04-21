@@ -2,8 +2,15 @@
 To'liq HTTP xavfsizlik sarlavhalari middleware.
 OWASP Secure Headers Project standartlariga muvofiq.
 """
+import os
+
+import environ
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
+
+# ADMIN_URL — .env dan o'qiymiz (masalan '17210707admin')
+_env = environ.Env()
+_ADMIN_URL_PREFIX = "/" + _env("ADMIN_URL", default="admin").strip("/") + "/"
 
 
 class SecurityHeadersMiddleware:
@@ -32,7 +39,8 @@ class SecurityHeadersMiddleware:
 
         # ── Content-Security-Policy ───────────────────────────────
         # Admin panelda unfold CDN kerak; APIda hech narsa yuklanmaydi.
-        if "/admin" not in request.path and not self._is_api(request):
+        is_admin = request.path.startswith(_ADMIN_URL_PREFIX)
+        if not is_admin and not self._is_api(request):
             response["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; "
@@ -45,7 +53,8 @@ class SecurityHeadersMiddleware:
                 "form-action 'self';"
             )
         else:
-            # Admin uchun birmuncha yumshoqroq CSP (unfold asset lari uchun)
+            # Admin uchun birmuncha yumshoqroq CSP (Unfold + Alpine.js uchun
+            # 'unsafe-eval' kerak — Alpine x-data/x-bind ifodalarini eval qiladi)
             response["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://fonts.gstatic.com; "
@@ -64,7 +73,7 @@ class SecurityHeadersMiddleware:
         # ── Brauzer API ruxsatlari ────────────────────────────────
         response["Permissions-Policy"] = (
             "camera=(), microphone=(), geolocation=(), "
-            "payment=(), usb=(), bluetooth=(), "
+            "payment=(), usb=(), "
             "accelerometer=(), gyroscope=()"
         )
 

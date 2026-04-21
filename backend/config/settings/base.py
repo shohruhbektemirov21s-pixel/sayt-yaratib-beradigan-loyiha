@@ -65,7 +65,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -110,6 +110,8 @@ USE_TZ = True
 # Static & Media
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+# Qo'shimcha manbalar — admin uchun custom JS
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
@@ -243,6 +245,10 @@ UNFOLD = {
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,
     "DASHBOARD_CALLBACK": "config.dashboard.dashboard_callback",
+    # Admin sahifalariga qo'shimcha JS — real-time auto-refresh
+    "SCRIPTS": [
+        lambda request: "/static/admin/js/realtime-refresh.js",
+    ],
     "COLORS": {
         "primary": {
             "50": "250 245 255",
@@ -314,6 +320,16 @@ UNFOLD = {
                         "title": "Versiyalar",
                         "icon": "history",
                         "link": "/17210707admin/website_projects/projectversion/",
+                    },
+                    {
+                        "title": "Suhbatlar",
+                        "icon": "forum",
+                        "link": "/17210707admin/website_projects/conversation/",
+                    },
+                    {
+                        "title": "Chat xabarlari",
+                        "icon": "chat",
+                        "link": "/17210707admin/website_projects/chatmessage/",
                     },
                 ],
             },

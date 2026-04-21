@@ -180,6 +180,45 @@ const SECTION_MAP: Record<string, React.FC<{ content: SectionContent }>> = {
   services: Services,
 };
 
+// ── Schema normalizer — istalgan formatni standartga keltiradi ──
+
+function normalizeSections(schema: SiteSchema): Section[] {
+  // Format 1: {pages: [{sections: [...]}]}
+  if (Array.isArray(schema.pages) && schema.pages.length > 0) {
+    const page = schema.pages.find((p) => p.slug === 'home') ?? schema.pages[0];
+    if (Array.isArray(page?.sections) && page.sections.length > 0) {
+      return page.sections;
+    }
+  }
+
+  // Format 2: {sections: [...]} — pages yo'q, to'g'ridan-to'g'ri
+  if (Array.isArray((schema as Record<string, unknown>).sections)) {
+    return (schema as Record<string, unknown>).sections as Section[];
+  }
+
+  // Format 3: Sxemaning o'zi section-like kalitlarga ega (hero, features, ...)
+  const knownKeys = ['hero', 'features', 'services', 'about', 'stats', 'pricing', 'contact'];
+  const inlineSections: Section[] = [];
+  for (const key of knownKeys) {
+    const val = (schema as Record<string, unknown>)[key];
+    if (val && typeof val === 'object') {
+      inlineSections.push({ id: key, type: key, content: val as SectionContent });
+    }
+  }
+  if (inlineSections.length > 0) return inlineSections;
+
+  // Format 4: pages mavjud lekin sections yo'q — pages ni section sifatida ko'rsatamiz
+  if (Array.isArray(schema.pages) && schema.pages.length > 0) {
+    return schema.pages.map((p, i) => ({
+      id: `page-${i}`,
+      type: 'hero',
+      content: { title: p.title ?? p.slug ?? `Sahifa ${i + 1}`, description: '' },
+    }));
+  }
+
+  return [];
+}
+
 // ── Main renderer ──────────────────────────────────────────────
 
 export const SiteRenderer = React.memo(function SiteRenderer({
@@ -189,16 +228,36 @@ export const SiteRenderer = React.memo(function SiteRenderer({
 }) {
   if (!schema) return null;
 
-  const pages = schema.pages ?? [];
-  if (pages.length === 0) {
-    return <div className="p-20 text-center font-bold text-zinc-500">Schema pages bo&#39;sh.</div>;
+  const sections = normalizeSections(schema);
+
+  if (sections.length === 0) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center p-16 text-center">
+        <div className="text-5xl mb-4">🏗️</div>
+        <p className="font-bold text-zinc-500 mb-2">Sayt bo&apos;limlari topilmadi</p>
+        <p className="text-zinc-400 text-sm">Chatda &quot;qaytadan yaratib ber&quot; deb yozing</p>
+      </div>
+    );
   }
 
-  const page = pages.find((p) => p.slug === 'home') ?? pages[0];
-  const sections = page.sections ?? [];
+  const siteName = String(schema.siteName ?? schema.name ?? '');
 
   return (
     <div className="w-full">
+      {/* Navbar */}
+      {siteName && (
+        <nav className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-100 px-6 py-4 flex items-center justify-between">
+          <span className="font-black text-lg text-zinc-900">{siteName}</span>
+          <div className="flex gap-4 text-sm text-zinc-500">
+            {sections.map((s) => (
+              <a key={s.id} href={`#${s.id}`} className="hover:text-zinc-900 transition-colors capitalize">
+                {s.type}
+              </a>
+            ))}
+          </div>
+        </nav>
+      )}
+
       {sections.map((section, i) => {
         const Component = SECTION_MAP[section.type?.toLowerCase() ?? ''];
         const content: SectionContent = (section.content as SectionContent) ?? {};
@@ -208,11 +267,15 @@ export const SiteRenderer = React.memo(function SiteRenderer({
               key={section.id ?? i}
               className="py-10 px-6 border border-dashed border-zinc-300 text-center text-zinc-400 m-6 rounded-3xl"
             >
-              Noma&apos;lum section: {section.type}
+              Bo&apos;lim: {section.type}
             </div>
           );
         }
-        return <Component key={section.id ?? i} content={content} />;
+        return (
+          <div key={section.id ?? i} id={section.id}>
+            <Component content={content} />
+          </div>
+        );
       })}
     </div>
   );

@@ -7,7 +7,7 @@
     "getStarted": "Boshlash"
   },
   "Hero": {
-    "badge": "Gemini 1.5 Pro asosida",
+    "badge": "",
     "titlePrefix": "Veb-saytingizni",
     "titleSuffix": "birgina prompt bilan quring",
     "description": "Biznesingizni istalgan tilda tasvirlab bering va bizning sun'iy intellektimiz bir necha soniya ichida matnlar, rasmlar va yuqori konversiyali maketlar bilan ta'minlangan premium veb-sayt yaratib beradi.",

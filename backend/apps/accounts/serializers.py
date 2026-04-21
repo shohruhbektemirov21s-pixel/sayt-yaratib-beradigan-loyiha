@@ -14,10 +14,17 @@ def _sanitize_text(value: str) -> str:
 
 
 class UserSerializer(serializers.ModelSerializer):
+    nano_coins = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'role', 'is_staff', 'date_joined')
-        read_only_fields = ('id', 'is_staff', 'date_joined')
+        fields = (
+            'id', 'email', 'full_name', 'role', 'is_staff', 'date_joined',
+            'tokens_balance', 'nano_coins',
+        )
+        read_only_fields = (
+            'id', 'is_staff', 'date_joined', 'tokens_balance', 'nano_coins',
+        )
 
 
 class RegisterSerializer(serializers.ModelSerializer):

@@ -17,6 +17,7 @@ interface Tariff {
   projects_limit: number;
   ai_generations_limit: number;
   features: string[];
+  is_active?: boolean;
 }
 
 // Fallback — API ishlamasa ko'rinadigan statik ma'lumot

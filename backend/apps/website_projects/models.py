@@ -57,3 +57,90 @@ class ProjectVersion(models.Model):
     class Meta:
         ordering = ['-created_at']
         unique_together = ('project', 'version_number')
+
+
+# ─────────────────────────────────────────────────────────────
+# Chat tarixi: Conversation (suhbat) + ChatMessage (yozishma)
+# Har bir foydalanuvchining AI bilan bo'lgan barcha yozishmalarini
+# saqlaydi. Suhbat yangilanganda, unga bog'liq loyiha paydo bo'lsa
+# `project` bog'lanadi.
+# ─────────────────────────────────────────────────────────────
+
+class Conversation(models.Model):
+    """AI bilan bir sessiya suhbati. Loyiha yaratilsa unga bog'lanadi."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations',
+    )
+    project = models.ForeignKey(
+        WebsiteProject,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='conversations',
+    )
+    title = models.CharField(max_length=255, blank=True)
+    language = models.CharField(max_length=10, default='uz')
+    # Agregat metrikalar — admin panel uchun qulay
+    total_messages = models.PositiveIntegerField(default=0)
+    total_tokens_input = models.PositiveIntegerField(default=0)
+    total_tokens_output = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['-updated_at']),
+            models.Index(fields=['user', '-updated_at']),
+        ]
+
+    def __str__(self):
+        title = self.title or '(sarlavhasiz)'
+        return f"{title} — {self.user.email}"
+
+
+class ChatRole(models.TextChoices):
+    USER = 'user', _('User')
+    ASSISTANT = 'assistant', _('AI')
+    SYSTEM = 'system', _('System')
+
+
+class ChatMessage(models.Model):
+    """Bitta xabar — user yoki AI tomonidan yuborilgan."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    role = models.CharField(max_length=20, choices=ChatRole.choices)
+    content = models.TextField()
+    # Intent: CHAT / ARCHITECT / REVISE / GENERATE / DESIGN_VARIANTS
+    intent = models.CharField(max_length=30, blank=True)
+    # Qo'shimcha ma'lumot: design_variants, stats, balance, schema snapshot
+    metadata = models.JSONField(null=True, blank=True)
+    # Agar bu xabar natijasida loyiha yaratilgan/yangilangan bo'lsa
+    project_version = models.ForeignKey(
+        ProjectVersion,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='messages',
+    )
+    # Tokenlar (AI xabarlari uchun)
+    tokens_input = models.PositiveIntegerField(default=0)
+    tokens_output = models.PositiveIntegerField(default=0)
+    # Generatsiya vaqti (ms) — AI xabarlari uchun
+    duration_ms = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['conversation', 'created_at']),
+        ]
+
+    def __str__(self):
+        preview = self.content[:60].replace('\n', ' ')
+        return f"[{self.role}] {preview}"
