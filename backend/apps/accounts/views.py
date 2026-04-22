@@ -113,8 +113,34 @@ class ProtectedTokenObtainPairView(TokenObtainPairView):
                     headers={"Retry-After": str(retry_em)},
                 )
 
-        # Asosiy login
-        response = super().post(request, *args, **kwargs)
+        # Asosiy login — xato bo'lsa AuthenticationFailed ko'tariladi
+        try:
+            response = super().post(request, *args, **kwargs)
+        except Exception as exc:
+            # Noto'g'ri credentials — urinishni qayd qilamiz
+            lockout_manager.record_failure(f"ip:{ip}")
+            remaining = lockout_manager.MAX_ATTEMPTS
+            if email:
+                remaining = lockout_manager.record_failure(f"email:{email}")
+            logger.warning("Login failed: email=%s ip=%s remaining=%s err=%s",
+                           email, ip, remaining, exc)
+
+            if remaining <= 0:
+                msg = "Juda ko'p noto'g'ri urinish. Akkaunt 30 daqiqaga bloklandi."
+            elif remaining == 1:
+                msg = "Noto'g'ri email yoki parol. Oxirgi 1 ta urinish qoldi! Keyin 30 daqiqaga bloklanadi."
+            else:
+                msg = f"Noto'g'ri email yoki parol. Yana {remaining} ta urinish qoldi."
+
+            return Response(
+                {
+                    "detail": msg,
+                    "remaining_attempts": remaining,
+                    "max_attempts": lockout_manager.MAX_ATTEMPTS,
+                    "locked": remaining <= 0,
+                },
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         if response.status_code == 200:
             # Muvaffaqiyatli login — lockoutni tozalash
