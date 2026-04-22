@@ -16,21 +16,51 @@ from .services import SubscriptionService
 @admin.register(Tariff)
 class TariffAdmin(ModelAdmin):
     list_display = [
-        "name", "price_display", "duration_days",
+        "name", "price_display", "nano_coins_display", "weekly_display", "duration_days",
         "projects_limit", "ai_generations_limit", "is_active", "subscribers_count",
     ]
     list_editable = ["is_active"]
     search_fields = ["name"]
     ordering = ["price"]
-    fields = [
-        "name", "description", "price", "duration_days",
-        "projects_limit", "pages_per_project_limit", "ai_generations_limit", "is_active",
-    ]
+    fieldsets = (
+        ("Asosiy", {
+            "fields": ("name", "description", "price", "duration_days", "is_active"),
+        }),
+        ("💎 Nano koin (AI kod yozuvchi uchun)", {
+            "fields": ("nano_coins_included",),
+            "description": (
+                "1 oyga beriladigan umumiy nano koin miqdori. Haftada 1/4 qismi "
+                "avtomatik hisobga qo'shiladi. 1 chat xabar = 500 nano koin."
+            ),
+        }),
+        ("Cheklovlar", {
+            "fields": ("projects_limit", "pages_per_project_limit", "ai_generations_limit"),
+        }),
+    )
 
     def price_display(self, obj):
         return format_html("<b>${}</b>", obj.price)
     price_display.short_description = "Narxi"
     price_display.admin_order_field = "price"
+
+    def nano_coins_display(self, obj):
+        if obj.nano_coins_included == 0:
+            return format_html('<span style="color:#6b7280">—</span>')
+        return format_html(
+            '<span style="color:#f59e0b;font-weight:700">💎 {}</span>',
+            f"{obj.nano_coins_included:,}",
+        )
+    nano_coins_display.short_description = "Oyiga nano"
+    nano_coins_display.admin_order_field = "nano_coins_included"
+
+    def weekly_display(self, obj):
+        if obj.nano_coins_included == 0:
+            return "—"
+        return format_html(
+            '<span style="color:#3b82f6;font-weight:600">{}/hafta</span>',
+            f"{obj.weekly_allowance:,}",
+        )
+    weekly_display.short_description = "Haftalik (÷4)"
 
     def subscribers_count(self, obj):
         count = Subscription.objects.filter(tariff=obj, status=SubscriptionStatus.ACTIVE).count()

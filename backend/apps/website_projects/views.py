@@ -9,14 +9,19 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.accounts.models import SITE_CREATION_COST, tokens_to_nano_coins
+from apps.accounts.models import (
+    CHAT_COST_NANO,
+    SITE_CREATION_COST,
+    TOKENS_PER_NANO_COIN,
+    tokens_to_nano_coins,
+)
 from apps.ai_generation.services import AIRouterService, ArchitectService, ClaudeService
 from apps.exports.services import ExportService
 
 # ── TEST REJIMI ───────────────────────────────────────────────
 # True bo'lsa — token balans tekshirilmaydi (cheklovsiz test).
-# Production uchun False qiling.
-TOKEN_LIMITS_DISABLED = True
+# False — real balans tizimi ishlaydi (chat bonus + obuna nano koin).
+TOKEN_LIMITS_DISABLED = False
 
 
 def _estimate_complexity(schema: Dict) -> Dict:
@@ -52,6 +57,51 @@ from .models import ChatMessage, ChatRole, Conversation, ProjectStatus, ProjectV
 from .serializers import WebsiteProjectSerializer
 
 logger = logging.getLogger(__name__)
+
+
+def _deduct_for_generation(
+    user, conversation: Optional[Conversation], cost_tokens: int,
+) -> Dict[str, int]:
+    """
+    Kod generatsiyasi uchun to'lov olish.
+    Birinchi navbatda conversation.chat_budget_nano (500 bonus) ishlatiladi,
+    undan keyin user.tokens_balance (obuna) yechiladi.
+
+    Returns: {"from_bonus": X_nano, "from_subscription": Y_tokens, "bonus_left": Z_nano}
+    """
+    cost_nano = cost_tokens // TOKENS_PER_NANO_COIN
+    from_bonus = 0
+    from_subscription = 0
+
+    # 1. Bonus chat budjetidan yechamiz
+    if conversation and conversation.chat_budget_nano > 0:
+        from_bonus = min(conversation.chat_budget_nano, cost_nano)
+        Conversation.objects.filter(id=conversation.id).update(
+            chat_budget_nano=F("chat_budget_nano") - from_bonus,
+        )
+        conversation.refresh_from_db(fields=["chat_budget_nano"])
+
+    # 2. Qolgan qismini obuna tokenlaridan yechamiz
+    remaining_nano = cost_nano - from_bonus
+    if remaining_nano > 0:
+        from_subscription = remaining_nano * TOKENS_PER_NANO_COIN
+        user.deduct_tokens(from_subscription)
+
+    return {
+        "from_bonus_nano": from_bonus,
+        "from_subscription_tokens": from_subscription,
+        "from_subscription_nano": from_subscription // TOKENS_PER_NANO_COIN,
+        "bonus_left": conversation.chat_budget_nano if conversation else 0,
+        "total_cost_nano": cost_nano,
+    }
+
+
+def _can_afford_generation(user, conversation: Optional[Conversation], cost_tokens: int) -> bool:
+    """Chat bonus + obuna birga yetadimi?"""
+    cost_nano = cost_tokens // TOKENS_PER_NANO_COIN
+    bonus = conversation.chat_budget_nano if conversation else 0
+    sub_nano = (user.tokens_balance or 0) // TOKENS_PER_NANO_COIN
+    return (bonus + sub_nano) >= cost_nano
 
 
 # ─────────────────────────────────────────────────────────────
@@ -213,13 +263,18 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
         # ARCHITECT keyinchalik FINAL_SITE_SPEC yig'ib Claude generatsiyaga o'tganda
         # ichkarida yana tekshiriladi (quyidagi blokda).
         if is_auth and intent == "REVISE" and not TOKEN_LIMITS_DISABLED:
-            if not request.user.can_afford(SITE_CREATION_COST):
+            if not _can_afford_generation(request.user, conversation, SITE_CREATION_COST):
+                bonus = conversation.chat_budget_nano if conversation else 0
                 return Response({
                     "success": False,
-                    "error": f"Token yetarli emas. Sayt tahrirlash uchun {SITE_CREATION_COST} token kerak, sizda {request.user.tokens_balance} ta bor.",
+                    "error": (
+                        f"Nano koin yetarli emas. Bu amal {CHAT_COST_NANO} nano koin. "
+                        f"Chat bonusi: {bonus} nano, obunada: {request.user.nano_coins} nano."
+                    ),
                     "insufficient_tokens": True,
-                    "required_tokens": SITE_CREATION_COST,
-                    "current_tokens": request.user.tokens_balance,
+                    "required_nano": CHAT_COST_NANO,
+                    "chat_bonus_nano": bonus,
+                    "subscription_nano": request.user.nano_coins,
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
         try:
@@ -254,14 +309,15 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                     project_version=version,
                     metadata={"project_id": str(project.id), "title": project.title},
                 )
-                # Token yechamiz — atomik (test rejimida o'tkazib yuboriladi)
+                # Nano koin yechamiz — avval chat bonusi, keyin obuna
+                deduction = None
                 if not TOKEN_LIMITS_DISABLED:
                     try:
-                        request.user.deduct_tokens(SITE_CREATION_COST)
+                        deduction = _deduct_for_generation(request.user, conversation, SITE_CREATION_COST)
                     except ValueError:
                         return Response({
                             "success": False,
-                            "error": "Token balans yetarli emas.",
+                            "error": "Nano koin balansi yetarli emas.",
                             "insufficient_tokens": True,
                         }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
@@ -276,6 +332,8 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                         "tokens": request.user.tokens_balance,
                         "nano_coins": request.user.nano_coins,
                         "cost": SITE_CREATION_COST,
+                        "chat_bonus_left": conversation.chat_budget_nano if conversation else 0,
+                        "deduction": deduction,
                     },
                 })
 
@@ -288,13 +346,20 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                 if spec:
                     # FINAL_SITE_SPEC topildi → Claude sayt generatsiya qiladi
                     # Generatsiyadan oldin balansni tekshiramiz (auth user uchun)
-                    if is_auth and not TOKEN_LIMITS_DISABLED and not request.user.can_afford(SITE_CREATION_COST):
+                    if is_auth and not TOKEN_LIMITS_DISABLED and not _can_afford_generation(
+                        request.user, conversation, SITE_CREATION_COST,
+                    ):
+                        bonus = conversation.chat_budget_nano if conversation else 0
                         return Response({
                             "success": False,
-                            "error": f"Token yetarli emas. Sayt yaratish uchun {SITE_CREATION_COST} token ({tokens_to_nano_coins(SITE_CREATION_COST)} nano koin) kerak. Sizda {request.user.tokens_balance} token ({request.user.nano_coins} nano koin) bor.",
+                            "error": (
+                                f"Nano koin yetarli emas. Sayt yaratish uchun {CHAT_COST_NANO} nano kerak. "
+                                f"Chat bonusi: {bonus}, obunada: {request.user.nano_coins}."
+                            ),
                             "insufficient_tokens": True,
-                            "required_tokens": SITE_CREATION_COST,
-                            "current_tokens": request.user.tokens_balance,
+                            "required_nano": CHAT_COST_NANO,
+                            "chat_bonus_nano": bonus,
+                            "subscription_nano": request.user.nano_coins,
                         }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
                     logger.info("FINAL_SITE_SPEC aniqlandi, Claude generatsiya boshlandi")
@@ -303,6 +368,15 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                     new_schema, usage = claude.generate_from_spec(spec)
                     gen_ms = int((time.monotonic() - gen_start) * 1000)
                     complexity = _estimate_complexity(new_schema)
+                    logger.info(
+                        "Claude schema: type=%s keys=%s siteName=%s pages=%s sections_in_first_page=%s",
+                        type(new_schema).__name__,
+                        list(new_schema.keys()) if isinstance(new_schema, dict) else "N/A",
+                        new_schema.get("siteName") if isinstance(new_schema, dict) else "N/A",
+                        len(new_schema.get("pages", [])) if isinstance(new_schema, dict) else "N/A",
+                        (len(new_schema["pages"][0].get("sections", []))
+                         if isinstance(new_schema, dict) and new_schema.get("pages") else "N/A"),
+                    )
 
                     balance_data: Optional[dict] = None
                     if is_auth:
@@ -336,14 +410,16 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                                     "architect_message": ai_text,
                                 },
                             )
-                        # Token yechamiz (test rejimida o'tkazib yuboriladi)
+                        # Nano koin yechamiz — avval chat bonusi, keyin obuna
                         if not TOKEN_LIMITS_DISABLED:
                             try:
-                                request.user.deduct_tokens(SITE_CREATION_COST)
+                                deduction = _deduct_for_generation(request.user, conversation, SITE_CREATION_COST)
                                 balance_data = {
                                     "tokens": request.user.tokens_balance,
                                     "nano_coins": request.user.nano_coins,
                                     "cost": SITE_CREATION_COST,
+                                    "chat_bonus_left": conversation.chat_budget_nano if conversation else 0,
+                                    "deduction": deduction,
                                 }
                             except ValueError:
                                 logger.warning("Token yechishda muammo user=%s", request.user.id)
@@ -397,13 +473,20 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
 
             # ── 3. TO'G'RIDAN-TO'G'RI GENERATSIYA (qisqa yo'l) ───────────
             # Balans tekshirish (auth user uchun)
-            if is_auth and not TOKEN_LIMITS_DISABLED and not request.user.can_afford(SITE_CREATION_COST):
+            if is_auth and not TOKEN_LIMITS_DISABLED and not _can_afford_generation(
+                request.user, conversation, SITE_CREATION_COST,
+            ):
+                bonus = conversation.chat_budget_nano if conversation else 0
                 return Response({
                     "success": False,
-                    "error": f"Token yetarli emas. Sayt yaratish uchun {SITE_CREATION_COST} token ({tokens_to_nano_coins(SITE_CREATION_COST)} nano koin) kerak. Sizda {request.user.tokens_balance} token ({request.user.nano_coins} nano koin) bor.",
+                    "error": (
+                        f"Nano koin yetarli emas. Sayt yaratish uchun {CHAT_COST_NANO} nano kerak. "
+                        f"Chat bonusi: {bonus}, obunada: {request.user.nano_coins}."
+                    ),
                     "insufficient_tokens": True,
-                    "required_tokens": SITE_CREATION_COST,
-                    "current_tokens": request.user.tokens_balance,
+                    "required_nano": CHAT_COST_NANO,
+                    "chat_bonus_nano": bonus,
+                    "subscription_nano": request.user.nano_coins,
                 }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
             gen_start = time.monotonic()
@@ -444,11 +527,13 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
                     )
                 if not TOKEN_LIMITS_DISABLED:
                     try:
-                        request.user.deduct_tokens(SITE_CREATION_COST)
+                        deduction2 = _deduct_for_generation(request.user, conversation, SITE_CREATION_COST)
                         balance_data2 = {
                             "tokens": request.user.tokens_balance,
                             "nano_coins": request.user.nano_coins,
                             "cost": SITE_CREATION_COST,
+                            "chat_bonus_left": conversation.chat_budget_nano if conversation else 0,
+                            "deduction": deduction2,
                         }
                     except ValueError:
                         logger.warning("Token yechishda muammo user=%s", request.user.id)
@@ -600,9 +685,25 @@ class WebsiteProjectViewSet(viewsets.ModelViewSet):
         schema_data = request.data.get("schema_data")
         language = str(request.data.get("language", "uz"))
 
+        # DEBUG: nima keldi?
+        logger.info(
+            "generate_files_inline: type=%s keys=%s",
+            type(schema_data).__name__,
+            list(schema_data.keys()) if isinstance(schema_data, dict) else "N/A",
+        )
+
         if not schema_data or not isinstance(schema_data, dict):
             return Response(
-                {"success": False, "error": "schema_data talab qilinadi."},
+                {
+                    "success": False,
+                    "error": "schema_data talab qilinadi.",
+                    "debug": {
+                        "received_type": type(schema_data).__name__,
+                        "is_none": schema_data is None,
+                        "is_dict": isinstance(schema_data, dict),
+                        "request_keys": list(request.data.keys()),
+                    },
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

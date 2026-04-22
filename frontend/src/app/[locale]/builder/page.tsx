@@ -45,6 +45,14 @@ interface Balance {
   tokens: number;
   nano_coins: number;
   cost: number;
+  chat_bonus_left?: number;
+  deduction?: {
+    from_bonus_nano: number;
+    from_subscription_nano: number;
+    from_subscription_tokens: number;
+    bonus_left: number;
+    total_cost_nano: number;
+  };
 }
 
 interface ApiResponse {
@@ -686,10 +694,34 @@ export default function BuilderPage() {
         setBuildStartTime(null);
         setIsGenerating(false);
 
-        // Balansni yangilaymiz
+        // Balansni yangilaymiz — chat bonus + obuna ko'rsatamiz
         if (data.balance) {
           updateBalance(data.balance.tokens, data.balance.nano_coins);
-          addMsg('ai', `💎 -${Math.ceil(data.balance.cost / 10)} nano koin hisobidan yechildi. Qoldi: ${data.balance.nano_coins} nano (${data.balance.tokens} token)`);
+          const d = data.balance.deduction as
+            | { from_bonus_nano: number; from_subscription_nano: number }
+            | undefined;
+          const bonusLeft = data.balance.chat_bonus_left ?? 0;
+          const subNano = data.balance.nano_coins ?? 0;
+
+          if (d) {
+            const parts: string[] = [];
+            if (d.from_bonus_nano > 0) parts.push(`💬 ${d.from_bonus_nano} chat bonusdan`);
+            if (d.from_subscription_nano > 0) parts.push(`💎 ${d.from_subscription_nano} obunadan`);
+            addMsg('ai',
+              `💸 **To'lov:** ${parts.join(' + ')}\n\n` +
+              `📊 **Qoldi:** 💬 ${bonusLeft} chat bonus · 💎 ${subNano} obuna nano`,
+            );
+          } else {
+            addMsg('ai', `💎 Qoldi: ${subNano} nano obuna · ${bonusLeft} chat bonus`);
+          }
+
+          // Balans kam qolsa ogohlantirish
+          const totalLeft = bonusLeft + subNano;
+          if (totalLeft < 500) {
+            addMsg('ai', `⚠️ **Nano koin tugadi!** Umumiy ${totalLeft} nano qoldi. Yangi chat oching (+500 bonus) yoki [obuna sotib oling](/profile).`);
+          } else if (totalLeft < 2000) {
+            addMsg('ai', `⚡ **Diqqat:** umumiy **${totalLeft} nano** qoldi (~${Math.floor(totalLeft / 500)} ta amal uchun). Yangi chat oching yoki obunani yangilang.`);
+          }
         }
 
         // IDE ko'rinish uchun fayllarni background'da olamiz
@@ -746,7 +778,10 @@ export default function BuilderPage() {
     setPreviewTitle('');
     setPreviewId(null);
     setCurrentProject(null as unknown as Parameters<typeof setCurrentProject>[0]);
-    setChatMessages([{ role: 'ai', text: '🔄 Yangi sayt yaratishni boshlaylik!\n\nQanday biznes uchun sayt kerak?' }]);
+    setChatMessages([{
+      role: 'ai',
+      text: '🔄 **Yangi chat ochildi!** 💬 Sizga 500 chat bonus nano koin berildi.\n\nQanday biznes uchun sayt kerak?',
+    }]);
     setHistory([]);
     setPhase('idle');
     setErrorMsg('');
@@ -756,6 +791,8 @@ export default function BuilderPage() {
     setFiles(null);
     setFilesReceivedAt(null);
     setBuildView('code');
+    // Yangi chat = yangi 500 bonus (backend tomonida yangi Conversation yaratiladi)
+    setConversationId(null);
   };
 
   // DONE bo'lganda kod fayllarini avtomatik olish (IDE ko'rinishi uchun)

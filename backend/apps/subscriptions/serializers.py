@@ -3,17 +3,21 @@ from .models import Tariff, Subscription
 
 class TariffSerializer(serializers.ModelSerializer):
     features = serializers.SerializerMethodField()
+    weekly_allowance = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Tariff
         fields = [
             "id", "name", "description", "price", "duration_days",
             "projects_limit", "pages_per_project_limit", "ai_generations_limit",
+            "nano_coins_included", "weekly_allowance",
             "is_active", "features",
         ]
 
     def get_features(self, obj):
         features = []
+        if obj.nano_coins_included > 0:
+            features.append(f"💎 {obj.nano_coins_included:,} nano koin (haftada {obj.weekly_allowance:,})")
         if obj.projects_limit == 0:
             features.append("Cheksiz loyihalar")
         else:
@@ -23,6 +27,7 @@ class TariffSerializer(serializers.ModelSerializer):
         else:
             features.append(f"{obj.ai_generations_limit} ta AI generatsiya")
         features.append(f"{obj.duration_days} kunlik obuna")
+        features.append("1 chat = 500 nano koin (AI kod)")
         return features
 
 class SubscriptionSerializer(serializers.ModelSerializer):

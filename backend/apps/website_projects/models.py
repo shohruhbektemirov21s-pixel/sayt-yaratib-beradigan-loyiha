@@ -86,6 +86,13 @@ class Conversation(models.Model):
     total_messages = models.PositiveIntegerField(default=0)
     total_tokens_input = models.PositiveIntegerField(default=0)
     total_tokens_output = models.PositiveIntegerField(default=0)
+    # Har bir yangi chat ochilganda 500 nano bonus beriladi.
+    # Bu AI kod yozishda birinchi navbatda ishlatiladi; tugagach user
+    # obuna tokenlaridan yechiladi.
+    chat_budget_nano = models.PositiveIntegerField(
+        default=500,
+        help_text="Chat uchun bonus nano koin (har yangi chatda 500 beriladi)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

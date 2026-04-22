@@ -81,9 +81,16 @@ class ProtectedTokenObtainPairView(TokenObtainPairView):
         # Lockout tekshiruvi (IP)
         locked_ip, retry_ip = lockout_manager.is_locked(f"ip:{ip}")
         if locked_ip:
+            minutes = max(1, round(retry_ip / 60))
             logger.warning("Login blocked (ip lockout): ip=%s", ip)
             return Response(
-                {"detail": f"IP bloklangi. {retry_ip} soniyadan keyin urinib ko'ring."},
+                {
+                    "detail": f"Juda ko'p noto'g'ri urinish. Iltimos, {minutes} daqiqadan keyin qayta urining.",
+                    "locked": True,
+                    "retry_after_seconds": retry_ip,
+                    "retry_after_minutes": minutes,
+                    "remaining_attempts": 0,
+                },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
                 headers={"Retry-After": str(retry_ip)},
             )
@@ -92,9 +99,16 @@ class ProtectedTokenObtainPairView(TokenObtainPairView):
         if email:
             locked_em, retry_em = lockout_manager.is_locked(f"email:{email}")
             if locked_em:
+                minutes = max(1, round(retry_em / 60))
                 logger.warning("Login blocked (email lockout): email=%s", email)
                 return Response(
-                    {"detail": f"Ushbu akkaunt vaqtincha bloklandi. {retry_em} soniyadan keyin urining."},
+                    {
+                        "detail": f"Ushbu akkaunt 5 marta noto'g'ri parol bilan bloklandi. {minutes} daqiqadan keyin urining.",
+                        "locked": True,
+                        "retry_after_seconds": retry_em,
+                        "retry_after_minutes": minutes,
+                        "remaining_attempts": 0,
+                    },
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                     headers={"Retry-After": str(retry_em)},
                 )
@@ -111,9 +125,26 @@ class ProtectedTokenObtainPairView(TokenObtainPairView):
         else:
             # Noto'g'ri parol — xato hisoblash
             lockout_manager.record_failure(f"ip:{ip}")
+            remaining = lockout_manager.MAX_ATTEMPTS
             if email:
-                lockout_manager.record_failure(f"email:{email}")
-            logger.warning("Login failed: email=%s ip=%s status=%s", email, ip, response.status_code)
+                remaining = lockout_manager.record_failure(f"email:{email}")
+            logger.warning("Login failed: email=%s ip=%s status=%s remaining=%s",
+                           email, ip, response.status_code, remaining)
+
+            # Javobni ko'paytirish — qolgan urinishlar soni
+            if remaining <= 0:
+                msg = "Juda ko'p noto'g'ri urinish. Akkaunt 30 daqiqaga bloklandi."
+            elif remaining == 1:
+                msg = "Noto'g'ri email yoki parol. Oxirgi 1 ta urinish qoldi! Keyin 30 daqiqaga bloklanadi."
+            else:
+                msg = f"Noto'g'ri email yoki parol. Yana {remaining} ta urinish qoldi."
+
+            data = response.data if isinstance(response.data, dict) else {}
+            data["detail"] = msg
+            data["remaining_attempts"] = remaining
+            data["max_attempts"] = lockout_manager.MAX_ATTEMPTS
+            data["locked"] = remaining <= 0
+            response.data = data
 
         return response
 

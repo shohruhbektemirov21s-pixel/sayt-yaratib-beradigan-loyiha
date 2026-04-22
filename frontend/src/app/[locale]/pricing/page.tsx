@@ -77,7 +77,7 @@ export default function PricingPage() {
         <div className="text-center mb-20">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">Oddiy va shaffof narxlar</h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            O&apos;zingizga mos rejani tanlang. Barcha rejalarda AI builder mavjud.
+            O&apos;zingizga mos rejani tanlang. Barcha rejalarda NanoStUp mavjud.
           </p>
         </div>
 

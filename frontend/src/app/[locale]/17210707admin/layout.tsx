@@ -103,7 +103,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="font-black text-sm tracking-tight">AI Builder</p>
+              <p className="font-black text-sm tracking-tight">NanoStUp</p>
               <p className="text-[10px] text-purple-400 font-semibold uppercase tracking-wider">Admin Panel</p>
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-2 text-xs text-zinc-500">
             <BarChart3 className="w-4 h-4" />
-            AI Website Builder Admin
+            NanoStUp Admin
           </div>
         </header>
 

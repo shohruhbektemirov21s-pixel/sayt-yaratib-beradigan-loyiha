@@ -90,22 +90,24 @@ DATABASES = {
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": 8},
+        "OPTIONS": {"min_length": 4},
     },
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-    {"NAME": "apps.accounts.password_validators.StrongPasswordValidator"},
-    {"NAME": "apps.accounts.password_validators.NoCommonPasswordValidator"},
 ]
 
-# i18n
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# i18n — Admin panel va butun tizim o'zbek tilida
+LANGUAGE_CODE = "uz"
+TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
 USE_TZ = True
+LANGUAGES = [
+    ("uz", "O'zbek"),
+    ("ru", "Русский"),
+    ("en", "English"),
+]
+# Loyihaning o'z tarjimalari — Django va Unfold'ning uz tarjimalari ustidan yoziladi
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locale")]
 
 # Static & Media
 STATIC_URL = "static/"
@@ -232,15 +234,15 @@ ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
 
 # SPECTACULAR SETTINGS
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'AI Website Builder API',
-    'DESCRIPTION': 'Production-ready AI Website Builder backend API',
+    'TITLE': 'NanoStUp API',
+    'DESCRIPTION': 'Production-ready NanoStUp backend API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
 # UNFOLD PREMIUM ADMIN SETTINGS
 UNFOLD = {
-    "SITE_TITLE": "AI Builder Admin",
-    "SITE_HEADER": "AI Website Builder",
+    "SITE_TITLE": "NanoStUp Admin",
+    "SITE_HEADER": "NanoStUp",
     "SITE_SYMBOL": "auto_awesome",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": False,

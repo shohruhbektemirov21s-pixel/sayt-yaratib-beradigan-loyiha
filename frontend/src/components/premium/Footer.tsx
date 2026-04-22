@@ -25,7 +25,7 @@ export function PremiumFooter() {
                 <Sparkles className="w-6 h-6 text-white" />
               </div>
               <span className="text-2xl font-black tracking-tight text-white">
-                AI Builder
+                NanoStUp
               </span>
             </Link>
             <p className="text-zinc-500 text-lg max-w-sm font-medium leading-relaxed">
@@ -59,7 +59,7 @@ export function PremiumFooter() {
 
         <div className="pt-12 border-t border-white/5 flex flex-col md:row items-center justify-between gap-6">
           <p className="text-zinc-600 text-sm font-medium">
-            © {new Date().getFullYear()} AI Builder. {t('rights')}
+            © {new Date().getFullYear()} NanoStUp. {t('rights')}
           </p>
           <div className="flex items-center gap-6 text-sm font-bold text-zinc-600">
              <span className="w-2 h-2 rounded-full bg-emerald-500" />

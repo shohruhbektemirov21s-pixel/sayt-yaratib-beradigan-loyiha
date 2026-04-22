@@ -37,8 +37,11 @@ class UserRole(models.TextChoices):
 # ═════════════════════════════════════════════════════════════
 
 DEFAULT_USER_TOKENS = 10_000
-SITE_CREATION_COST = 3_000
+# 1 chat xabar (sayt yaratish yoki tahrirlash) — 500 nano koin.
+# 10 token = 1 nano koin → 500 nano = 5 000 token
+SITE_CREATION_COST = 5_000
 TOKENS_PER_NANO_COIN = 10  # 1000 tokens = 100 nano coins
+CHAT_COST_NANO = 500  # 1 chat = 500 nano (frontend uchun ham)
 
 
 def tokens_to_nano_coins(tokens: int) -> int:

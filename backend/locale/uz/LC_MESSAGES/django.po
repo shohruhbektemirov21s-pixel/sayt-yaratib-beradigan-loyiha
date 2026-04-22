@@ -1,0 +1,445 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: uz\n"
+
+# ─── Auth / Login ──────────────────────────────────────────
+msgid "Log in"
+msgstr "Kirish"
+
+msgid "Log in again"
+msgstr "Qayta kirish"
+
+msgid "Logged out"
+msgstr "Tizimdan chiqildi"
+
+msgid "Log out"
+msgstr "Chiqish"
+
+msgid "Thanks for spending some quality time with the Web site today."
+msgstr "Bugun saytda bo'lganingiz uchun rahmat."
+
+msgid "Username"
+msgstr "Foydalanuvchi nomi"
+
+msgid "Password"
+msgstr "Parol"
+
+msgid "Password confirmation"
+msgstr "Parolni tasdiqlash"
+
+msgid "Change password"
+msgstr "Parolni o'zgartirish"
+
+msgid "Your password was changed."
+msgstr "Parolingiz o'zgartirildi."
+
+msgid "Please enter a correct %(username)s and password. Note that both fields may be case-sensitive."
+msgstr "To'g'ri %(username)s va parolni kiriting. Har ikkala maydon katta-kichik harflarga sezgir."
+
+msgid "Forgotten your password or username?"
+msgstr "Parol yoki foydalanuvchi nomini unutdingizmi?"
+
+msgid "Welcome,"
+msgstr "Xush kelibsiz,"
+
+# ─── Common buttons ────────────────────────────────────────
+msgid "Save"
+msgstr "Saqlash"
+
+msgid "Save and add another"
+msgstr "Saqlash va yana qo'shish"
+
+msgid "Save and continue editing"
+msgstr "Saqlash va tahrirni davom ettirish"
+
+msgid "Save as new"
+msgstr "Yangi sifatida saqlash"
+
+msgid "Delete"
+msgstr "O'chirish"
+
+msgid "Delete?"
+msgstr "O'chirilsinmi?"
+
+msgid "Confirm"
+msgstr "Tasdiqlash"
+
+msgid "Cancel"
+msgstr "Bekor qilish"
+
+msgid "Close"
+msgstr "Yopish"
+
+msgid "Add"
+msgstr "Qo'shish"
+
+msgid "Add another"
+msgstr "Yana qo'shish"
+
+msgid "Change"
+msgstr "O'zgartirish"
+
+msgid "Edit"
+msgstr "Tahrirlash"
+
+msgid "View"
+msgstr "Ko'rish"
+
+msgid "Remove"
+msgstr "Olib tashlash"
+
+msgid "Clear"
+msgstr "Tozalash"
+
+msgid "Clear all"
+msgstr "Barchasini tozalash"
+
+msgid "Search"
+msgstr "Qidirish"
+
+msgid "Filter"
+msgstr "Filtr"
+
+msgid "Yes"
+msgstr "Ha"
+
+msgid "No"
+msgstr "Yo'q"
+
+msgid "Unknown"
+msgstr "Noma'lum"
+
+msgid "None"
+msgstr "Yo'q"
+
+# ─── Navigation ────────────────────────────────────────────
+msgid "Home"
+msgstr "Bosh sahifa"
+
+msgid "Dashboard"
+msgstr "Boshqaruv paneli"
+
+msgid "Site administration"
+msgstr "Sayt administratsiyasi"
+
+msgid "View on site"
+msgstr "Saytda ko'rish"
+
+msgid "History"
+msgstr "Tarix"
+
+msgid "Recent actions"
+msgstr "So'nggi amallar"
+
+msgid "My actions"
+msgstr "Mening amallarim"
+
+msgid "None available"
+msgstr "Ma'lumot yo'q"
+
+# ─── Changelist ────────────────────────────────────────────
+msgid "%(count)s selected"
+msgid_plural "All %(count)s selected"
+msgstr[0] "%(count)s ta tanlangan"
+msgstr[1] "Barchasi %(count)s ta tanlangan"
+
+msgid "0 of %(count)s selected"
+msgstr "%(count)s dan 0 ta tanlangan"
+
+msgid "Action:"
+msgstr "Amal:"
+
+msgid "Go"
+msgstr "Bajarish"
+
+msgid "Run the selected action"
+msgstr "Tanlangan amalni bajarish"
+
+msgid "Action"
+msgstr "Amal"
+
+msgid "Actions"
+msgstr "Amallar"
+
+msgid "Click here to select the objects across all pages"
+msgstr "Barcha sahifadagi obyektlarni tanlash"
+
+msgid "Select all"
+msgstr "Barchasini tanlash"
+
+msgid "Clear selection"
+msgstr "Tanlovni olib tashlash"
+
+msgid "All"
+msgstr "Barchasi"
+
+msgid "Any date"
+msgstr "Istalgan sana"
+
+msgid "Today"
+msgstr "Bugun"
+
+msgid "Yesterday"
+msgstr "Kecha"
+
+msgid "Past 7 days"
+msgstr "Oxirgi 7 kun"
+
+msgid "This month"
+msgstr "Shu oy"
+
+msgid "This year"
+msgstr "Shu yil"
+
+msgid "Has date"
+msgstr "Sana bor"
+
+msgid "No date"
+msgstr "Sana yo'q"
+
+# ─── Form errors / messages ────────────────────────────────
+msgid "This field is required."
+msgstr "Bu maydon majburiy."
+
+msgid "Please correct the error below."
+msgid_plural "Please correct the errors below."
+msgstr[0] "Quyidagi xatoni tuzating."
+msgstr[1] "Quyidagi xatolarni tuzating."
+
+msgid "The %(name)s \"%(obj)s\" was added successfully."
+msgstr "%(name)s \"%(obj)s\" muvaffaqiyatli qo'shildi."
+
+msgid "The %(name)s \"%(obj)s\" was changed successfully."
+msgstr "%(name)s \"%(obj)s\" muvaffaqiyatli o'zgartirildi."
+
+msgid "The %(name)s \"%(obj)s\" was deleted successfully."
+msgstr "%(name)s \"%(obj)s\" muvaffaqiyatli o'chirildi."
+
+msgid "You may edit it again below."
+msgstr "Quyida qayta tahrir qilishingiz mumkin."
+
+# ─── Permissions / User fields ─────────────────────────────
+msgid "Permissions"
+msgstr "Ruxsatlar"
+
+msgid "User permissions"
+msgstr "Foydalanuvchi ruxsatlari"
+
+msgid "Staff status"
+msgstr "Admin maqomi"
+
+msgid "Superuser status"
+msgstr "Super admin maqomi"
+
+msgid "Active"
+msgstr "Faol"
+
+msgid "Groups"
+msgstr "Guruhlar"
+
+msgid "Group"
+msgstr "Guruh"
+
+msgid "Important dates"
+msgstr "Muhim sanalar"
+
+msgid "Personal info"
+msgstr "Shaxsiy ma'lumot"
+
+msgid "Last login"
+msgstr "Oxirgi kirish"
+
+msgid "Date joined"
+msgstr "Ro'yxatdan o'tgan sana"
+
+msgid "Email address"
+msgstr "Email manzili"
+
+msgid "Email"
+msgstr "Email"
+
+msgid "First name"
+msgstr "Ism"
+
+msgid "Last name"
+msgstr "Familiya"
+
+msgid "Full name"
+msgstr "To'liq ism"
+
+msgid "Designates whether this user should be treated as active. Unselect this instead of deleting accounts."
+msgstr "Foydalanuvchi faolmi? O'chirish o'rniga shuni yeching."
+
+msgid "Designates whether the user can log into this admin site."
+msgstr "Foydalanuvchi admin panelga kira oladimi?"
+
+msgid "Designates that this user has all permissions without explicitly assigning them."
+msgstr "Foydalanuvchi barcha ruxsatlarga egami (superadmin)?"
+
+# ─── Common field labels ───────────────────────────────────
+msgid "Name"
+msgstr "Nomi"
+
+msgid "Description"
+msgstr "Tavsif"
+
+msgid "Price"
+msgstr "Narxi"
+
+msgid "Duration days"
+msgstr "Muddati (kun)"
+
+msgid "Is active"
+msgstr "Faol"
+
+msgid "Created at"
+msgstr "Yaratilgan"
+
+msgid "Updated at"
+msgstr "Yangilangan"
+
+msgid "Created"
+msgstr "Yaratilgan"
+
+msgid "Updated"
+msgstr "Yangilangan"
+
+msgid "Title"
+msgstr "Sarlavha"
+
+msgid "Status"
+msgstr "Holat"
+
+msgid "Type"
+msgstr "Turi"
+
+msgid "Amount"
+msgstr "Miqdor"
+
+msgid "Language"
+msgstr "Til"
+
+msgid "User"
+msgstr "Foydalanuvchi"
+
+msgid "Project"
+msgstr "Loyiha"
+
+# ─── App labels ────────────────────────────────────────────
+msgid "Subscriptions"
+msgstr "Obunalar"
+
+msgid "Subscription"
+msgstr "Obuna"
+
+msgid "Tariffs"
+msgstr "Tariflar"
+
+msgid "Tariff"
+msgstr "Tarif"
+
+msgid "Accounts"
+msgstr "Foydalanuvchilar"
+
+msgid "Users"
+msgstr "Foydalanuvchilar"
+
+msgid "Authentication and Authorization"
+msgstr "Autentifikatsiya va Ruxsatlar"
+
+msgid "Payments"
+msgstr "To'lovlar"
+
+msgid "Payment transactions"
+msgstr "To'lov tranzaksiyalari"
+
+msgid "Payment transaction"
+msgstr "To'lov tranzaksiyasi"
+
+msgid "Website projects"
+msgstr "Yaratilgan saytlar"
+
+msgid "Website project"
+msgstr "Yaratilgan sayt"
+
+msgid "Conversations"
+msgstr "Suhbatlar"
+
+msgid "Conversation"
+msgstr "Suhbat"
+
+msgid "Chat messages"
+msgstr "Chat xabarlari"
+
+msgid "Chat message"
+msgstr "Chat xabari"
+
+msgid "Project versions"
+msgstr "Loyiha versiyalari"
+
+msgid "Notifications"
+msgstr "Bildirishnomalar"
+
+msgid "Notification"
+msgstr "Bildirishnoma"
+
+# ─── Pagination / counts ───────────────────────────────────
+msgid "Show all"
+msgstr "Barchasini ko'rsatish"
+
+msgid "1 result"
+msgid_plural "%(counter)s results"
+msgstr[0] "1 ta natija"
+msgstr[1] "%(counter)s ta natija"
+
+msgid "%(full_result_count)s total"
+msgstr "jami %(full_result_count)s ta"
+
+# ─── Autocomplete / selection ──────────────────────────────
+msgid "Available %(name)s"
+msgstr "Mavjud %(name)s"
+
+msgid "Chosen %(name)s"
+msgstr "Tanlangan %(name)s"
+
+msgid "Choose"
+msgstr "Tanlash"
+
+msgid "Remove all"
+msgstr "Barchasini olib tashlash"
+
+msgid "Choose all"
+msgstr "Barchasini tanlash"
+
+msgid "Type into this box to filter down the list of available %(name)s."
+msgstr "Mavjud %(name)s ro'yxatini filtrlash uchun yozing."
+
+# ─── Password reset ────────────────────────────────────────
+msgid "Password reset"
+msgstr "Parolni tiklash"
+
+msgid "Reset my password"
+msgstr "Parolimni tiklash"
+
+msgid "Password reset complete"
+msgstr "Parol tiklandi"
+
+# ─── Unfold / Dashboard ────────────────────────────────────
+msgid "Search apps and models..."
+msgstr "App va modellarni qidirish..."
+
+msgid "Toggle navigation"
+msgstr "Menyuni ko'rsatish"
+
+msgid "Open"
+msgstr "Ochish"
+
+msgid "Preview"
+msgstr "Ko'rib chiqish"
+
+msgid "Hide"
+msgstr "Yashirish"
+
+msgid "Show"
+msgstr "Ko'rsatish"

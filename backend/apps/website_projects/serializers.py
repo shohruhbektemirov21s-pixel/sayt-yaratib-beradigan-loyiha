@@ -36,6 +36,7 @@ class ConversationListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'language', 'project', 'project_title',
             'total_messages', 'total_tokens_input', 'total_tokens_output',
+            'chat_budget_nano',
             'created_at', 'updated_at',
         )
 
@@ -50,5 +51,6 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'language', 'project', 'project_title',
             'total_messages', 'total_tokens_input', 'total_tokens_output',
+            'chat_budget_nano',
             'created_at', 'updated_at', 'messages',
         )

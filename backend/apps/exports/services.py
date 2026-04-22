@@ -169,7 +169,7 @@ Backend API endpointlari:
 """ if has_backend else ""
 
     return f"""# {project.title}
-> AI Website Builder (Gemini + Claude) yordamida yaratildi
+> NanoStUp (Gemini + Claude) yordamida yaratildi
 
 ## Loyiha tuzilmasi
 ```
@@ -203,7 +203,7 @@ python3 -m http.server 8080
 {"- **Backend**: Node.js, Express.js, Nodemailer" if has_backend else ""}
 
 ---
-Yaratilgan: {project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'hozir'} | AI Website Builder
+Yaratilgan: {project.created_at.strftime('%Y-%m-%d %H:%M') if project.created_at else 'hozir'} | NanoStUp
 """
 
 
